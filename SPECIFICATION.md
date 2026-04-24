@@ -22,7 +22,8 @@
 | 構造体・クラス（`struct`, `class`） | |
 | テンプレート（`template<>`） | |
 | 関数ポインタ | |
-| 名前空間（`namespace`） | `using namespace std;` は許可 |
+| 名前空間（`namespace`） | `using namespace std;` を含め非対応 |
+| カンマ区切り宣言（`int a, b;`） | 単一宣言のみ対応 |
 | プリプロセッサ（`#include`, `#define` 等） | 将来対応予定 |
 | ビット演算子（`&`, `|`, `^`, `~`, `<<`, `>>`） | 将来対応候補 |
 | キャスト構文（`(int)x`, `static_cast<>` 等） | |
@@ -121,7 +122,8 @@ string s = "hello";
 
 ```cpp
 int dp[1001];
-int n, m;
+int n;
+int m;
 
 int main() {
     cin >> n >> m;
@@ -283,6 +285,7 @@ int g = gcd(a, b);
 ### 7.4 エントリーポイント
 
 - `int main()` が必須
+- `main` は引数なしのみ対応
 - `main` の戻り値は無視してよい
 - `argc`、`argv` は非対応
 
@@ -307,7 +310,8 @@ cin >> s;          // string（空白区切りで1トークン）
 
 - `int`、`long long`、`bool`、`string` 型変数への入力に対応
 - 配列要素への直接入力も可：`cin >> a[i]`
-- `using namespace std;` が宣言されていなくても `cin` / `cout` は使用可能（暗黙的に解決）
+- `using namespace std;` は不要。`cin` / `cout` / `cerr` / `endl` は予約語として直接使える
+- ただし `using namespace std;` そのものの構文は非対応
 
 ### 8.2 `cout`
 
@@ -346,6 +350,10 @@ cerr << "debug: " << x << "\n";
 | `reverse(v.begin(), v.end())` | vector の反転 | |
 | `fill(v.begin(), v.end(), x)` | vector の一括初期化 | |
 
+- 組み込み関数名は予約語ではない。ユーザー定義関数が同名ならユーザー定義を優先する
+- `swap` の引数は lvalue（変数または添字アクセス）でなければならない
+- `sort` / `reverse` / `fill` は `vector` に対する完全範囲 `v.begin(), v.end()` のみ対応
+- `sort` の comparator は `greater<int>()` 形式のみ対応
 - `sort` 等の `begin()` / `end()` はイテレータの模倣として構文解析レベルで特別扱いする
 - 固定長配列への `sort`（`sort(a, a + n)`）は将来対応
 
@@ -366,8 +374,12 @@ cerr << "debug: " << x << "\n";
 | 未宣言識別子 | `error: 'x' was not declared in this scope` |
 | 型の不一致 | `error: cannot convert 'int' to 'bool'` |
 | 引数数の不一致 | `error: too few arguments to function 'f'` |
+| 引数数過多 | `error: too many arguments to function 'f'` |
 | void 関数からの値返却 | `error: return-statement with a value, in function returning 'void'` |
+| 非 void 関数で値なし return | `error: return-statement with no value, in function returning non-void` |
 | ループ外の `break`/`continue` | `error: break statement not within loop` |
+| 不正な `main` シグネチャ | `error: 'main' must return 'int'` |
+| `swap` の非 lvalue 引数 | `error: swap arguments must be lvalues` |
 | 非対応構文の使用 | `error: this feature is not supported in this interpreter` |
 
 ### 10.2 実行時エラー

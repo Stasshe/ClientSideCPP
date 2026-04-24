@@ -1,5 +1,5 @@
 {
-  "name": "stasshe-npm",
+  "name": "clientside-cpp",
   "version": "0.0.0",
   "type": "module",
   "description": "",
@@ -24,7 +24,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Stasshe/stasshe-npm"
+    "url": "https://github.com/Stasshe/ClientSideCPP"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",
