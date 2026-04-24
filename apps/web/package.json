@@ -13,9 +13,11 @@
     "@codemirror/language": "^6.11.3",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.38.6",
+    "lucide-react": "^1.11.0",
     "next": "^16.2.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "thememirror": "^2.0.1"
   },
   "devDependencies": {
     "@types/node": "24.5.1",

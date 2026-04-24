@@ -2,7 +2,6 @@
 
 import { cpp } from "@codemirror/lang-cpp";
 import { Compartment, EditorState, RangeSetBuilder } from "@codemirror/state";
-import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import {
   Decoration,
   EditorView,
@@ -11,9 +10,21 @@ import {
   highlightActiveLineGutter,
   lineNumbers,
 } from "@codemirror/view";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  ArrowDownToLine,
+  BugPlay,
+  CirclePlay,
+  RotateCcw,
+  StepBack,
+  StepForward,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DebugSession } from "@clientsidecpp/index";
 import type { DebugState, ScopeView } from "@clientsidecpp/types";
+import { dracula } from "thememirror";
 
 const starterSource = `using namespace std;
 
@@ -177,8 +188,6 @@ function scrollLineIntoView(view: EditorView, lineNumber: number) {
 const editorTheme = EditorView.theme({
   "&": {
     height: "100%",
-    backgroundColor: "var(--bg)",
-    color: "var(--text)",
     fontFamily: "var(--font-mono)",
     fontSize: "13px",
   },
@@ -189,26 +198,14 @@ const editorTheme = EditorView.theme({
   },
   ".cm-content": {
     padding: "0 0 24px",
-    caretColor: "var(--text-bright)",
   },
   ".cm-line": {
     padding: "0 12px",
-  },
-  ".cm-cursor": {
-    borderLeftColor: "var(--text-bright)",
-  },
-  ".cm-selectionBackground, ::selection": {
-    backgroundColor: "rgba(79, 193, 255, 0.22)",
-  },
-  ".cm-activeLine": {
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
   },
   ".cm-activeLineGutter": {
     backgroundColor: "transparent",
   },
   ".cm-gutters": {
-    backgroundColor: "var(--bg2)",
-    color: "var(--text-dim)",
     borderRight: "1px solid var(--border)",
   },
   ".cm-lineNumbers .cm-gutterElement": {
@@ -245,46 +242,7 @@ const editorTheme = EditorView.theme({
   ".cm-focused": {
     outline: "none",
   },
-  ".cm-tooltip": {
-    border: "1px solid var(--border)",
-    backgroundColor: "var(--bg3)",
-  },
 });
-
-// ── Icon primitives ──────────────────────────────────────────────────────────
-const I = {
-  Launch: () => (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-      <path d="M5 3.5l7 4.5-7 4.5V3.5z" />
-    </svg>
-  ),
-  Continue: () => (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-      <path d="M4 3.5l5 4.5-5 4.5V3.5zm6 0h1.5v9H10V3.5z" />
-    </svg>
-  ),
-  Restart: () => (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-      <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 1 1 .908-.416A6 6 0 1 1 8 2v1z" />
-      <path d="M8 2l2 2-2 2V2z" />
-    </svg>
-  ),
-  StepInto: () => (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-      <path d="M8 1v8M5 6l3 3 3-3M3 13h10" stroke="currentColor" strokeWidth="1.4" fill="none" />
-    </svg>
-  ),
-  StepOver: () => (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-      <path d="M4 4a4 4 0 0 1 8 0v5M9 6l3 3-3 3" stroke="currentColor" strokeWidth="1.4" fill="none" />
-    </svg>
-  ),
-  StepOut: () => (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-      <path d="M8 15V7M5 10l3-3 3 3M3 3h10" stroke="currentColor" strokeWidth="1.4" fill="none" />
-    </svg>
-  ),
-};
 
 export function Playground() {
   const [source, setSource] = useState(starterSource);
@@ -379,7 +337,7 @@ export function Playground() {
         highlightActiveLineGutter(),
         EditorView.lineWrapping,
         cpp(),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        dracula,
         editorTheme,
         breakpointCompartment.of(createBreakpointGutter(breakpoints, onToggleBreakpoint)),
         executionCompartment.of([
@@ -488,7 +446,7 @@ export function Playground() {
             onClick={handleLaunch}
             disabled={isPending}
           >
-            <I.Launch />
+            <BugPlay size={14} strokeWidth={2} />
           </button>
           <button
             className="tb-btn run"
@@ -496,7 +454,7 @@ export function Playground() {
             onClick={handleContinue}
             disabled={isPending}
           >
-            <I.Continue />
+            <CirclePlay size={14} strokeWidth={2} />
           </button>
           <button
             className="tb-btn danger"
@@ -504,7 +462,7 @@ export function Playground() {
             onClick={handleRestart}
             disabled={isPending}
           >
-            <I.Restart />
+            <RotateCcw size={14} strokeWidth={2} />
           </button>
           <div className="sep" />
           <button
@@ -513,7 +471,7 @@ export function Playground() {
             onClick={handleStepInto}
             disabled={!canStep || isPending}
           >
-            <I.StepInto />
+            <ArrowDownToLine size={14} strokeWidth={2} />
           </button>
           <button
             className="tb-btn"
@@ -521,7 +479,7 @@ export function Playground() {
             onClick={handleStepOver}
             disabled={!canStep || isPending}
           >
-            <I.StepOver />
+            <StepForward size={14} strokeWidth={2} />
           </button>
           <button
             className="tb-btn"
@@ -529,7 +487,7 @@ export function Playground() {
             onClick={handleStepOut}
             disabled={!canStep || isPending}
           >
-            <I.StepOut />
+            <StepBack size={14} strokeWidth={2} />
           </button>
         </div>
 
@@ -547,7 +505,8 @@ export function Playground() {
 
         {isDirty && (
           <div className="dirty-notice">
-            ⚠ Source changed - next action will restart
+            <AlertCircle size={12} strokeWidth={2} />
+            <span>Source changed - next action will restart</span>
           </div>
         )}
 
@@ -624,7 +583,7 @@ export function Playground() {
         <div className="io-area">
           <div className="io-pane">
             <div className="io-header">
-              <span className="io-icon">→</span>stdin
+              <ArrowRight size={12} strokeWidth={2} className="io-icon" />stdin
             </div>
             <div className="io-body">
               <textarea
@@ -648,14 +607,14 @@ export function Playground() {
                   className={`io-tab${activeOutputTab === "stdout" ? " active" : ""}`}
                   onClick={() => setActiveOutputTab("stdout")}
                 >
-                  <span className="io-icon">←</span>stdout
+                  <ArrowLeft size={12} strokeWidth={2} className="io-icon" />stdout
                 </button>
                 <button
                   type="button"
                   className={`io-tab${activeOutputTab === "stderr" ? " active" : ""}`}
                   onClick={() => setActiveOutputTab("stderr")}
                 >
-                  <span className="io-icon" style={{ color: "var(--red)" }}>!</span>stderr
+                  <AlertCircle size={12} strokeWidth={2} className="io-icon io-icon-err" />stderr
                 </button>
               </div>
             </div>

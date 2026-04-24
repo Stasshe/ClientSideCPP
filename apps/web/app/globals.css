@@ -126,6 +126,9 @@ pre, code, textarea { font-family: var(--font-mono); }
 
 /* Dirty notice */
 .dirty-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 3px 8px;
   font-size: 10px;
   color: var(--orange);
@@ -315,6 +318,7 @@ pre, code, textarea { font-family: var(--font-mono); }
   color: var(--text-bright);
 }
 .io-icon { font-size: 11px; }
+.io-icon-err { color: var(--red); }
 .io-body {
   flex: 1;
   min-height: 0;
