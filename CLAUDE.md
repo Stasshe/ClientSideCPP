@@ -86,3 +86,9 @@ index.ts → すべて
 
 `runtime` は `parser` を知らない。`parser` は `runtime` を知らない。
 責任・境界分離を明確に
+
+
+
+Vitestを使用
+Q: テストファイルの配置はどちらにする？
+A: src/に共置（*.test.tsをsrc内に）
