@@ -1,14 +1,8 @@
 import { runProgram } from "./interpreter/interpreter";
 import { lex } from "./parser/lexer";
 import { parse } from "./parser/parser";
-import type {
-  BlockStmtNode,
-  CompileError,
-  CompileResult,
-  ProgramNode,
-  RunResult,
-  StatementNode,
-} from "./types";
+import { validateProgram } from "./semantic/validator";
+import type { CompileError, CompileResult, ProgramNode, RunResult } from "./types";
 
 export function compile(source: string): CompileResult {
   const lexed = lex(source);
@@ -79,62 +73,4 @@ export function compileAndRun(source: string, input = "", filename = "<input>"):
     };
   }
   return runResult;
-}
-
-function validateProgram(program: ProgramNode): CompileError[] {
-  const errors: CompileError[] = [];
-
-  for (const fn of program.functions) {
-    validateBlock(fn.body, 0, errors);
-  }
-
-  return errors;
-}
-
-function validateBlock(block: BlockStmtNode, loopDepth: number, errors: CompileError[]): void {
-  for (const stmt of block.statements) {
-    validateStatement(stmt, loopDepth, errors);
-  }
-}
-
-function validateStatement(stmt: StatementNode, loopDepth: number, errors: CompileError[]): void {
-  switch (stmt.kind) {
-    case "BlockStmt":
-      validateBlock(stmt, loopDepth, errors);
-      return;
-    case "IfStmt":
-      for (const branch of stmt.branches) {
-        validateBlock(branch.thenBlock, loopDepth, errors);
-      }
-      if (stmt.elseBlock !== null) {
-        validateBlock(stmt.elseBlock, loopDepth, errors);
-      }
-      return;
-    case "WhileStmt":
-      validateBlock(stmt.body, loopDepth + 1, errors);
-      return;
-    case "ForStmt":
-      validateBlock(stmt.body, loopDepth + 1, errors);
-      return;
-    case "BreakStmt":
-      if (loopDepth === 0) {
-        errors.push({
-          line: stmt.line,
-          col: stmt.col,
-          message: "break statement not within a loop",
-        });
-      }
-      return;
-    case "ContinueStmt":
-      if (loopDepth === 0) {
-        errors.push({
-          line: stmt.line,
-          col: stmt.col,
-          message: "continue statement not within a loop",
-        });
-      }
-      return;
-    default:
-      return;
-  }
 }

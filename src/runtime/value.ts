@@ -1,4 +1,4 @@
-import type { PrimitiveTypeName } from "../types";
+import type { PrimitiveTypeName, PrimitiveTypeNode } from "../types";
 
 export type RuntimeValue =
   | { kind: "int"; value: bigint }
@@ -8,8 +8,9 @@ export type RuntimeValue =
   | { kind: "void" }
   | { kind: "uninitialized"; expected: "int" | "bool" | "string" };
 
-export function defaultValueForType(typeName: PrimitiveTypeName): RuntimeValue {
-  switch (typeName) {
+export function defaultValueForType(typeName: PrimitiveTypeName | PrimitiveTypeNode): RuntimeValue {
+  const normalizedType = typeof typeName === "string" ? typeName : typeName.name;
+  switch (normalizedType) {
     case "int":
     case "long long":
       return { kind: "int", value: 0n };
@@ -22,14 +23,15 @@ export function defaultValueForType(typeName: PrimitiveTypeName): RuntimeValue {
   }
 }
 
-export function uninitializedForType(typeName: PrimitiveTypeName): RuntimeValue {
-  if (typeName === "void") {
+export function uninitializedForType(typeName: PrimitiveTypeName | PrimitiveTypeNode): RuntimeValue {
+  const normalizedType = typeof typeName === "string" ? typeName : typeName.name;
+  if (normalizedType === "void") {
     return { kind: "void" };
   }
-  if (typeName === "long long") {
+  if (normalizedType === "long long") {
     return { kind: "uninitialized", expected: "int" };
   }
-  return { kind: "uninitialized", expected: typeName };
+  return { kind: "uninitialized", expected: normalizedType };
 }
 
 export function stringifyValue(value: RuntimeValue): string {

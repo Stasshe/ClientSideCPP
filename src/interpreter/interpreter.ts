@@ -13,15 +13,15 @@ import type {
   ExprNode,
   FrameView,
   FunctionDeclNode,
-  ParamTypeName,
-  PrimitiveTypeName,
   ProgramNode,
   RunResult,
   RuntimeErrorInfo,
   ScopeView,
   StatementNode,
+  TypeNode,
   VectorDeclNode,
 } from "../types";
+import { isPrimitiveType } from "../types";
 
 type Scope = Map<string, RuntimeValue>;
 type PrimitiveElementType = "int" | "bool" | "string";
@@ -163,9 +163,9 @@ class Interpreter {
     if (decl.kind === "VarDecl") {
       const value =
         decl.initializer === null
-          ? defaultValueForType(decl.typeName)
+          ? defaultValueForType(this.expectPrimitiveType(decl.type, decl.line))
           : this.evaluateExpr(decl.initializer);
-      this.globals.set(decl.name, this.assertPrimitiveType(decl.typeName, value, decl.line));
+      this.globals.set(decl.name, this.assertType(decl.type, value, decl.line));
       return;
     }
 
@@ -196,23 +196,23 @@ class Interpreter {
       if (param === undefined || arg === undefined) {
         this.fail(`too few arguments to function '${fn.name}'`, fn.line);
       }
-      this.define(param.name, this.assertParamType(param.typeName, arg, param.line));
+      this.define(param.name, this.assertType(param.type, arg, param.line));
     }
 
     try {
       this.executeBlock(fn.body, false);
       this.scopeStack.pop();
-      if (fn.returnType === "void") {
+      if (this.isVoidType(fn.returnType)) {
         return { kind: "void" };
       }
-      return uninitializedForType(fn.returnType);
+      return uninitializedForType(this.expectPrimitiveType(fn.returnType, fn.line));
     } catch (signal) {
       this.scopeStack.pop();
       if (signal instanceof ReturnSignal) {
-        if (fn.returnType === "void") {
+        if (this.isVoidType(fn.returnType)) {
           return { kind: "void" };
         }
-        return this.assertPrimitiveType(fn.returnType, signal.value, fn.line);
+        return this.assertType(fn.returnType, signal.value, fn.line);
       }
       throw signal;
     } finally {
@@ -247,9 +247,9 @@ class Interpreter {
       case "VarDecl": {
         const value =
           stmt.initializer === null
-            ? uninitializedForType(stmt.typeName)
-            : this.assertPrimitiveType(
-                stmt.typeName,
+            ? uninitializedForType(this.expectPrimitiveType(stmt.type, stmt.line))
+            : this.assertType(
+                stmt.type,
                 this.evaluateExpr(stmt.initializer),
                 stmt.line,
               );
@@ -298,9 +298,9 @@ class Interpreter {
             const initDecl = stmt.init.value;
             const value =
               initDecl.initializer === null
-                ? uninitializedForType(initDecl.typeName)
-                : this.assertPrimitiveType(
-                    initDecl.typeName,
+                ? uninitializedForType(this.expectPrimitiveType(initDecl.type, initDecl.line))
+                : this.assertType(
+                    initDecl.type,
                     this.evaluateExpr(initDecl.initializer),
                     initDecl.line,
                   );
@@ -384,7 +384,7 @@ class Interpreter {
     }
 
     const sizeAsNumber = Number(decl.size);
-    const elementType = this.toElementType(decl.elementType, decl.line);
+    const elementType = this.toElementType(decl.type.elementType, decl.line);
     const values = Array.from({ length: sizeAsNumber }, () =>
       decl.initializers.length > 0
         ? this.defaultPrimitiveValue(elementType)
@@ -407,7 +407,7 @@ class Interpreter {
   }
 
   private defineVectorDecl(decl: VectorDeclNode, scope: Scope): void {
-    const elementType = this.toElementType(decl.elementType, decl.line);
+    const elementType = this.toElementType(decl.type.elementType, decl.line);
     const args = decl.constructorArgs.map((arg) => this.evaluateExpr(arg));
     let values: RuntimeValue[] = [];
 
@@ -907,12 +907,11 @@ class Interpreter {
     return initialized;
   }
 
-  private defaultPrimitiveValue(typeName: PrimitiveTypeName | PrimitiveElementType): RuntimeValue {
-    const normalized = typeName === "long long" ? "int" : typeName;
-    if (normalized === "int") {
+  private defaultPrimitiveValue(typeName: PrimitiveElementType): RuntimeValue {
+    if (typeName === "int") {
       return { kind: "int", value: 0n };
     }
-    if (normalized === "bool") {
+    if (typeName === "bool") {
       return { kind: "bool", value: false };
     }
     return { kind: "string", value: "" };
@@ -975,12 +974,8 @@ class Interpreter {
     this.fail(`'${name}' was not declared in this scope`, line);
   }
 
-  private assertPrimitiveType(
-    typeName: PrimitiveTypeName,
-    value: RuntimeValue,
-    line: number,
-  ): RuntimeValue {
-    const normalizedType = typeName === "long long" ? "int" : typeName;
+  private assertPrimitiveType(type: TypeNode, value: RuntimeValue, line: number): RuntimeValue {
+    const normalizedType = this.normalizePrimitiveType(type, line);
     if (normalizedType === "void") {
       return { kind: "void" };
     }
@@ -999,24 +994,24 @@ class Interpreter {
     return value;
   }
 
-  private assertParamType(typeName: ParamTypeName, value: RuntimeValue, line: number): RuntimeValue {
-    if (typeof typeName === "string") {
-      return this.assertPrimitiveType(typeName, value, line);
+  private assertType(type: TypeNode, value: RuntimeValue, line: number): RuntimeValue {
+    if (isPrimitiveType(type)) {
+      return this.assertPrimitiveType(type, value, line);
     }
 
     if (value.kind !== "array") {
-      this.fail(`cannot convert '${value.kind}' to '${typeName.kind}'`, line);
+      this.fail(`cannot convert '${value.kind}' to '${this.typeKindName(type)}'`, line);
     }
 
-    if (value.elementType !== this.toElementType(typeName.elementType, line)) {
-      this.fail(`cannot convert '${value.elementType}' to '${typeName.elementType}'`, line);
+    if (value.elementType !== this.toElementType(type.elementType, line)) {
+      this.fail(`cannot convert '${value.elementType}' to '${type.elementType.name}'`, line);
     }
 
-    if (typeName.kind === "vector" && !value.dynamic) {
+    if (type.kind === "VectorType" && !value.dynamic) {
       this.fail("cannot convert 'array' to 'vector'", line);
     }
 
-    if (typeName.kind === "array" && value.dynamic) {
+    if (type.kind === "ArrayType" && value.dynamic) {
       this.fail("cannot convert 'vector' to 'array'", line);
     }
 
@@ -1058,7 +1053,8 @@ class Interpreter {
     throw new RuntimeTrap(message, this.currentFunction, line);
   }
 
-  private toElementType(typeName: PrimitiveTypeName, line: number): PrimitiveElementType {
+  private toElementType(type: TypeNode, line: number): PrimitiveElementType {
+    const typeName = this.normalizePrimitiveType(type, line);
     if (typeName === "int" || typeName === "long long") {
       return "int";
     }
@@ -1069,6 +1065,33 @@ class Interpreter {
       return "string";
     }
     this.fail("element type cannot be void", line);
+  }
+
+  private expectPrimitiveType(type: TypeNode, line: number): Extract<TypeNode, { kind: "PrimitiveType" }> {
+    if (!isPrimitiveType(type)) {
+      this.fail(`expected primitive type, got '${this.typeKindName(type)}'`, line);
+    }
+    return type;
+  }
+
+  private isVoidType(type: TypeNode): boolean {
+    return isPrimitiveType(type) && type.name === "void";
+  }
+
+  private normalizePrimitiveType(type: TypeNode, line: number): "int" | "long long" | "bool" | "string" | "void" {
+    const primitive = this.expectPrimitiveType(type, line);
+    return primitive.name;
+  }
+
+  private typeKindName(type: TypeNode): string {
+    switch (type.kind) {
+      case "PrimitiveType":
+        return type.name;
+      case "ArrayType":
+        return "array";
+      case "VectorType":
+        return "vector";
+    }
   }
 
   private buildDebugInfo(): DebugInfo {

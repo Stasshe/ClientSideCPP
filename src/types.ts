@@ -1,9 +1,21 @@
 export type PrimitiveTypeName = "int" | "long long" | "bool" | "string" | "void";
 
-export type ParamTypeName =
-  | PrimitiveTypeName
-  | { kind: "array"; elementType: Exclude<PrimitiveTypeName, "void"> }
-  | { kind: "vector"; elementType: Exclude<PrimitiveTypeName, "void"> };
+export type PrimitiveTypeNode = {
+  kind: "PrimitiveType";
+  name: PrimitiveTypeName;
+};
+
+export type ArrayTypeNode = {
+  kind: "ArrayType";
+  elementType: PrimitiveTypeNode;
+};
+
+export type VectorTypeNode = {
+  kind: "VectorType";
+  elementType: PrimitiveTypeNode;
+};
+
+export type TypeNode = PrimitiveTypeNode | ArrayTypeNode | VectorTypeNode;
 
 export type SourceLocation = {
   line: number;
@@ -22,7 +34,7 @@ export type GlobalDeclNode = VarDeclNode | ArrayDeclNode | VectorDeclNode;
 
 export type FunctionDeclNode = NodeBase & {
   kind: "FunctionDecl";
-  returnType: PrimitiveTypeName;
+  returnType: TypeNode;
   name: string;
   params: ParamNode[];
   body: BlockStmtNode;
@@ -30,7 +42,7 @@ export type FunctionDeclNode = NodeBase & {
 
 export type ParamNode = NodeBase & {
   kind: "Param";
-  typeName: ParamTypeName;
+  type: TypeNode;
   name: string;
 };
 
@@ -57,14 +69,14 @@ export type BlockStmtNode = NodeBase & {
 
 export type VarDeclNode = NodeBase & {
   kind: "VarDecl";
-  typeName: PrimitiveTypeName;
+  type: TypeNode;
   name: string;
   initializer: ExprNode | null;
 };
 
 export type ArrayDeclNode = NodeBase & {
   kind: "ArrayDecl";
-  elementType: PrimitiveTypeName;
+  type: ArrayTypeNode;
   name: string;
   size: bigint;
   initializers: ExprNode[];
@@ -72,7 +84,7 @@ export type ArrayDeclNode = NodeBase & {
 
 export type VectorDeclNode = NodeBase & {
   kind: "VectorDecl";
-  elementType: PrimitiveTypeName;
+  type: VectorTypeNode;
   name: string;
   constructorArgs: ExprNode[];
 };
@@ -297,3 +309,38 @@ export type DebugState = {
   stepCount: number;
   pauseReason: "step" | "breakpoint" | null;
 };
+
+export function primitiveType(name: PrimitiveTypeName): PrimitiveTypeNode {
+  return { kind: "PrimitiveType", name };
+}
+
+export function arrayType(elementType: PrimitiveTypeNode): ArrayTypeNode {
+  return { kind: "ArrayType", elementType };
+}
+
+export function vectorType(elementType: PrimitiveTypeNode): VectorTypeNode {
+  return { kind: "VectorType", elementType };
+}
+
+export function isPrimitiveType(type: TypeNode): type is PrimitiveTypeNode {
+  return type.kind === "PrimitiveType";
+}
+
+export function isArrayType(type: TypeNode): type is ArrayTypeNode {
+  return type.kind === "ArrayType";
+}
+
+export function isVectorType(type: TypeNode): type is VectorTypeNode {
+  return type.kind === "VectorType";
+}
+
+export function typeToString(type: TypeNode): string {
+  switch (type.kind) {
+    case "PrimitiveType":
+      return type.name;
+    case "ArrayType":
+      return `${type.elementType.name}[]`;
+    case "VectorType":
+      return `vector<${type.elementType.name}>`;
+  }
+}

@@ -10,14 +10,16 @@ import type {
   ForInitNode,
   FunctionDeclNode,
   GlobalDeclNode,
-  PrimitiveTypeName,
+  PrimitiveTypeNode,
   ProgramNode,
   StatementNode,
   Token,
+  TypeNode,
   UnaryExprNode,
   VarDeclNode,
   VectorDeclNode,
 } from "../types";
+import { arrayType, isPrimitiveType, primitiveType, vectorType } from "../types";
 
 const TYPE_KEYWORDS = new Set<string>(["int", "long", "bool", "string", "void"]);
 
@@ -42,24 +44,14 @@ class Parser {
     const functions: FunctionDeclNode[] = [];
 
     while (!this.isAtEnd()) {
-      if (this.checkKeyword("vector")) {
-        const decl = this.parseVectorDecl();
-        if (decl !== null) {
-          globals.push(decl);
-        } else {
-          this.synchronizeTopLevel();
-        }
-        continue;
-      }
-
-      if (!this.peekTypeKeyword()) {
+      if (!this.checkTypeStart()) {
         this.errorAtCurrent("expected type specifier");
         this.synchronizeTopLevel();
         continue;
       }
 
-      const typeName = this.parseTypeName();
-      if (typeName === null) {
+      const type = this.parseType();
+      if (type === null) {
         this.synchronizeTopLevel();
         continue;
       }
@@ -79,7 +71,7 @@ class Parser {
         }
         functions.push({
           kind: "FunctionDecl",
-          returnType: typeName,
+          returnType: type,
           name: nameToken.text,
           params,
           body,
@@ -90,9 +82,19 @@ class Parser {
       }
 
       if (this.matchSymbol("[")) {
-        const arrayDecl = this.finishArrayDecl(typeName, nameToken);
+        const arrayDecl = this.finishArrayDecl(type, nameToken);
         if (arrayDecl !== null) {
           globals.push(arrayDecl);
+        } else {
+          this.synchronizeTopLevel();
+        }
+        continue;
+      }
+
+      if (type.kind === "VectorType") {
+        const decl = this.finishVectorDecl(type, nameToken);
+        if (decl !== null) {
+          globals.push(decl);
         } else {
           this.synchronizeTopLevel();
         }
@@ -106,7 +108,7 @@ class Parser {
       }
       globals.push({
         kind: "VarDecl",
-        typeName,
+        type,
         name: nameToken.text,
         initializer,
         line: nameToken.line,
@@ -142,26 +144,22 @@ class Parser {
     }
 
     while (true) {
-      const typeName = this.parseParamTypeName();
-      if (typeName === null) {
+      const type = this.parseParamType();
+      if (type === null) {
         break;
       }
       const nameToken = this.consumeIdentifier("expected parameter name");
       if (nameToken === null) {
         break;
       }
-      let paramType = typeName;
-      if (
-        typeof typeName === "string" &&
-        typeName !== "void" &&
-        this.matchSymbol("[")
-      ) {
+      let paramType = type;
+      if (isPrimitiveType(type) && type.name !== "void" && this.matchSymbol("[")) {
         this.consumeSymbol("]", "expected ']' after array parameter");
-        paramType = { kind: "array", elementType: typeName };
+        paramType = arrayType(type);
       }
       params.push({
         kind: "Param",
-        typeName: paramType,
+        type: paramType,
         name: nameToken.text,
         line: nameToken.line,
         col: nameToken.col,
@@ -179,38 +177,8 @@ class Parser {
     return params;
   }
 
-  private parseParamTypeName(): FunctionDeclNode["params"][number]["typeName"] | null {
-    if (this.checkKeyword("vector")) {
-      return this.parseVectorParamTypeName();
-    }
-    return this.parseTypeName();
-  }
-
-  private parseVectorParamTypeName(): Extract<
-    FunctionDeclNode["params"][number]["typeName"],
-    { kind: "vector" }
-  > | null {
-    if (!this.consumeKeyword("vector", "expected 'vector'")) {
-      return null;
-    }
-    if (!this.consumeSymbol("<", "expected '<' after vector")) {
-      return null;
-    }
-
-    const elementType = this.parseTypeName();
-    if (elementType === null) {
-      return null;
-    }
-    if (elementType === "void") {
-      this.errorAtCurrent("vector element type cannot be void");
-      return null;
-    }
-
-    if (!this.consumeSymbol(">", "expected '>' after vector element type")) {
-      return null;
-    }
-
-    return { kind: "vector", elementType };
+  private parseParamType(): FunctionDeclNode["params"][number]["type"] | null {
+    return this.parseType();
   }
 
   private parseRequiredBlock(errorMessage: string): BlockStmtNode | null {
@@ -263,13 +231,9 @@ class Parser {
       return this.parseRequiredBlock("expected block");
     }
 
-    if (this.checkKeyword("vector")) {
-      return this.parseVectorDecl();
-    }
-
-    if (this.peekTypeKeyword()) {
-      const typeName = this.parseTypeName();
-      if (typeName === null) {
+    if (this.checkTypeStart()) {
+      const type = this.parseType();
+      if (type === null) {
         return null;
       }
       const nameToken = this.consumeIdentifier("expected variable name");
@@ -277,7 +241,10 @@ class Parser {
         return null;
       }
       if (this.matchSymbol("[")) {
-        return this.finishArrayDecl(typeName, nameToken);
+        return this.finishArrayDecl(type, nameToken);
+      }
+      if (type.kind === "VectorType") {
+        return this.finishVectorDecl(type, nameToken);
       }
       const initializer = this.matchSymbol("=") ? this.parseExpression() : null;
       if (!this.consumeSymbol(";", "expected ';' after variable declaration")) {
@@ -285,7 +252,7 @@ class Parser {
       }
       return {
         kind: "VarDecl",
-        typeName,
+        type,
         name: nameToken.text,
         initializer,
         line: nameToken.line,
@@ -494,7 +461,7 @@ class Parser {
       return { kind: "none" };
     }
 
-    if (this.peekTypeKeyword()) {
+    if (this.peekPrimitiveTypeKeyword()) {
       const decl = this.parseVarDeclNoSemicolon();
       if (decl === null) {
         return { kind: "none" };
@@ -513,8 +480,8 @@ class Parser {
   }
 
   private parseVarDeclNoSemicolon(): VarDeclNode | null {
-    const typeName = this.parseTypeName();
-    if (typeName === null) {
+    const type = this.parsePrimitiveType();
+    if (type === null) {
       return null;
     }
 
@@ -526,7 +493,7 @@ class Parser {
     const initializer = this.matchSymbol("=") ? this.parseExpression() : null;
     return {
       kind: "VarDecl",
-      typeName,
+      type,
       name: nameToken.text,
       initializer,
       line: nameToken.line,
@@ -534,8 +501,12 @@ class Parser {
     };
   }
 
-  private finishArrayDecl(elementType: PrimitiveTypeName, nameToken: Token): ArrayDeclNode | null {
-    if (elementType === "void") {
+  private finishArrayDecl(type: TypeNode, nameToken: Token): ArrayDeclNode | null {
+    if (!isPrimitiveType(type)) {
+      this.errorAt(nameToken, "array element type must be primitive");
+      return null;
+    }
+    if (type.name === "void") {
       this.errorAt(nameToken, "array element type cannot be void");
       return null;
     }
@@ -573,7 +544,7 @@ class Parser {
 
     return {
       kind: "ArrayDecl",
-      elementType,
+      type: arrayType(type),
       name: nameToken.text,
       size: BigInt(sizeToken.text),
       initializers,
@@ -582,33 +553,7 @@ class Parser {
     };
   }
 
-  private parseVectorDecl(): VectorDeclNode | null {
-    const vectorToken = this.peek();
-    if (!this.consumeKeyword("vector", "expected 'vector'")) {
-      return null;
-    }
-    if (!this.consumeSymbol("<", "expected '<' after vector")) {
-      return null;
-    }
-
-    const elementType = this.parseTypeName();
-    if (elementType === null) {
-      return null;
-    }
-    if (elementType === "void") {
-      this.errorAtCurrent("vector element type cannot be void");
-      return null;
-    }
-
-    if (!this.consumeSymbol(">", "expected '>' after vector element type")) {
-      return null;
-    }
-
-    const nameToken = this.consumeIdentifier("expected vector variable name");
-    if (nameToken === null) {
-      return null;
-    }
-
+  private finishVectorDecl(type: VectorDeclNode["type"], nameToken: Token): VectorDeclNode | null {
     const constructorArgs: ExprNode[] = [];
     if (this.matchSymbol("(")) {
       if (!this.matchSymbol(")")) {
@@ -628,11 +573,11 @@ class Parser {
 
     return {
       kind: "VectorDecl",
-      elementType,
+      type,
       name: nameToken.text,
       constructorArgs,
-      line: vectorToken.line,
-      col: vectorToken.col,
+      line: nameToken.line,
+      col: nameToken.col,
     };
   }
 
@@ -899,22 +844,50 @@ class Parser {
     return expr;
   }
 
-  private parseTypeName(): PrimitiveTypeName | null {
+  private parseType(): TypeNode | null {
+    if (this.checkKeyword("vector")) {
+      return this.parseVectorType();
+    }
+    return this.parsePrimitiveType();
+  }
+
+  private parseVectorType(): VectorDeclNode["type"] | null {
+    if (!this.consumeKeyword("vector", "expected 'vector'")) {
+      return null;
+    }
+    if (!this.consumeSymbol("<", "expected '<' after vector")) {
+      return null;
+    }
+    const elementType = this.parsePrimitiveType();
+    if (elementType === null) {
+      return null;
+    }
+    if (elementType.name === "void") {
+      this.errorAtCurrent("vector element type cannot be void");
+      return null;
+    }
+    if (!this.consumeSymbol(">", "expected '>' after vector element type")) {
+      return null;
+    }
+    return vectorType(elementType);
+  }
+
+  private parsePrimitiveType(): PrimitiveTypeNode | null {
     if (this.matchKeyword("int")) {
-      return "int";
+      return primitiveType("int");
     }
     if (this.matchKeyword("bool")) {
-      return "bool";
+      return primitiveType("bool");
     }
     if (this.matchKeyword("string")) {
-      return "string";
+      return primitiveType("string");
     }
     if (this.matchKeyword("void")) {
-      return "void";
+      return primitiveType("void");
     }
     if (this.matchKeyword("long")) {
       if (this.matchKeyword("long")) {
-        return "long long";
+        return primitiveType("long long");
       }
       this.errorAtCurrent("expected 'long' after 'long'");
       return null;
@@ -923,9 +896,13 @@ class Parser {
     return null;
   }
 
-  private peekTypeKeyword(): boolean {
+  private peekPrimitiveTypeKeyword(): boolean {
     const token = this.peek();
     return token.kind === "keyword" && TYPE_KEYWORDS.has(token.text);
+  }
+
+  private checkTypeStart(): boolean {
+    return this.peekPrimitiveTypeKeyword() || this.checkKeyword("vector");
   }
 
   private consume(kind: Token["kind"], message: string): Token | null {
@@ -1034,7 +1011,7 @@ class Parser {
 
   private synchronizeTopLevel(): void {
     while (!this.isAtEnd()) {
-      if (this.peekTypeKeyword() || this.checkKeyword("vector")) {
+      if (this.checkTypeStart()) {
         return;
       }
       this.advance();
