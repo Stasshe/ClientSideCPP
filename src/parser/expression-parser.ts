@@ -293,6 +293,16 @@ export abstract class ExpressionParser extends BaseParser {
       };
     }
 
+    if (this.matchKeyword("endl")) {
+      const t = this.previous();
+      return {
+        kind: "Identifier",
+        name: "endl",
+        line: t.line,
+        col: t.col,
+      };
+    }
+
     if (this.match("identifier")) {
       const id = this.previous();
       return {

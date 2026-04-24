@@ -120,6 +120,19 @@ int main() {
     expect(result.output.stdout).toBe("ok\n");
   });
 
+  it("endl works as a reserved word", () => {
+    const source = `
+int main() {
+  cout << "a" << endl;
+  cout << "b" << endl;
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("a\nb\n");
+  });
+
   it("accepts include bits stdc++ header", () => {
     const source = `
 #include <bits/stdc++.h>

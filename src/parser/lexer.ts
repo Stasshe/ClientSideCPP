@@ -24,6 +24,7 @@ const KEYWORDS = new Set<string>([
   "cin",
   "cout",
   "cerr",
+  "endl",
 ]);
 
 const TWO_CHAR_SYMBOLS = new Set<string>([
