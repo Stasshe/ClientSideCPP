@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DebugSession } from "@clientsidecpp/index";
-import type { ArrayView, DebugState, ScopeView } from "@clientsidecpp/types";
+import type { DebugState, ScopeView } from "@clientsidecpp/types";
 
 const starterSource = `using namespace std;
 
@@ -62,15 +62,16 @@ function cloneState(state: DebugState): DebugState {
   };
 }
 
-function getArrayLabel(a: ArrayView): string {
-  return a.dynamic ? `vector#${a.ref}` : `array#${a.ref}`;
-}
-
 function getScopeTitle(scope: ScopeView, index: number): string {
   if (scope.name.startsWith("scope#")) {
     return index === 0 ? "current scope" : `outer scope ${index}`;
   }
   return scope.name;
+}
+
+function getArrayRef(value: string): number | null {
+  const match = value.match(/^<(?:array|vector)#(\d+)>$/);
+  return match ? Number(match[1]) : null;
 }
 
 // ── Icon primitives ──────────────────────────────────────────────────────────
@@ -115,6 +116,7 @@ export function Playground() {
   const [execution, setExecution] = useState<DebugState>(initialExecution);
   const [breakpoints, setBreakpoints] = useState<number[]>([]);
   const [isDirty, setIsDirty] = useState(false);
+  const [activeOutputTab, setActiveOutputTab] = useState<"stdout" | "stderr">("stdout");
   const [isPending, startTransition] = useTransition();
 
   const sessionRef = useRef<DebugSession | null>(null);
@@ -122,6 +124,10 @@ export function Playground() {
   const gutterInnerRef = useRef<HTMLDivElement | null>(null);
 
   const sourceLines = useMemo(() => source.split("\n"), [source]);
+  const arraysByRef = useMemo(
+    () => new Map(execution.arrays.map((arr) => [arr.ref, arr])),
+    [execution.arrays]
+  );
   const hasSession = sessionRef.current !== null;
   const canStep =
     hasSession &&
@@ -196,6 +202,24 @@ export function Playground() {
   }, []);
 
   const st = execution.status;
+  const renderVarRow = (v: { name: string; kind: string; value: string }, scopeKey: string) => {
+    const arrayRef = v.kind === "array" ? getArrayRef(v.value) : null;
+    const arrayView = arrayRef === null ? null : arraysByRef.get(arrayRef);
+
+    return (
+      <div key={`${scopeKey}-${v.name}`} className="var-block">
+        <div className="var-row">
+          <span className="var-name">{v.name}</span>
+          <span className="var-type">
+            {arrayView ? (arrayView.dynamic ? "vector" : "array") : v.kind}
+          </span>
+          <span className={`var-val${arrayView ? " array-ref" : ""}`}>
+            {arrayView ? `[${arrayView.values.join(", ")}]` : v.value}
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="ide">
@@ -310,22 +334,9 @@ export function Playground() {
               <div className="empty-row">No local variables</div>
             ) : (
               execution.localVars.map((scope, idx) => (
-                <div key={`${scope.name}-${idx}`} className="var-scope">
+                  <div key={`${scope.name}-${idx}`} className="var-scope">
                   <div className="scope-name">{getScopeTitle(scope, idx)}</div>
-                  {scope.vars.map((v) => (
-                    <div
-                      key={`${scope.name}-${v.name}`}
-                      className="var-row"
-                    >
-                      <span className="var-name">{v.name}</span>
-                      <span className="var-type">{v.kind}</span>
-                      <span
-                        className={`var-val${v.kind === "ARRAY" ? " array-ref" : ""}`}
-                      >
-                        {v.value}
-                      </span>
-                    </div>
-                  ))}
+                  {scope.vars.map((v) => renderVarRow(v, scope.name))}
                 </div>
               ))
             )}
@@ -339,37 +350,10 @@ export function Playground() {
                 <span className="count">{execution.globalVars.length}</span>
               </div>
               <div className="var-scope">
-                {execution.globalVars.map((v) => (
-                  <div key={v.name} className="var-row">
-                    <span className="var-name">{v.name}</span>
-                    <span className="var-type">{v.kind}</span>
-                    <span className="var-val">{v.value}</span>
-                  </div>
-                ))}
+                {execution.globalVars.map((v) => renderVarRow(v, "global"))}
               </div>
             </div>
           )}
-
-          {/* Arrays / Vectors */}
-          <div className="dbg-section">
-            <div className="dbg-header">
-              Arrays / Vectors
-              <span className="count">{execution.arrays.length}</span>
-            </div>
-            {execution.arrays.length === 0 ? (
-              <div className="empty-row">No arrays in memory</div>
-            ) : (
-              execution.arrays.map((arr) => (
-                <div key={arr.ref} className="array-item">
-                  <div className="array-hdr">
-                    {getArrayLabel(arr)}
-                    <span className="array-type-badge">{arr.elementType}</span>
-                  </div>
-                  <div className="array-vals">[{arr.values.join(", ")}]</div>
-                </div>
-              ))
-            )}
-          </div>
 
           {/* Error */}
           {execution.error && (
@@ -444,28 +428,38 @@ export function Playground() {
             </div>
           </div>
 
-          <div className="io-pane">
+          <div className="io-pane output-pane">
             <div className="io-header">
-              <span className="io-icon">←</span>stdout
+              <div className="io-tabs">
+                <button
+                  type="button"
+                  className={`io-tab${activeOutputTab === "stdout" ? " active" : ""}`}
+                  onClick={() => setActiveOutputTab("stdout")}
+                >
+                  <span className="io-icon">←</span>stdout
+                </button>
+                <button
+                  type="button"
+                  className={`io-tab${activeOutputTab === "stderr" ? " active" : ""}`}
+                  onClick={() => setActiveOutputTab("stderr")}
+                >
+                  <span className="io-icon" style={{ color: "var(--red)" }}>!</span>stderr
+                </button>
+              </div>
             </div>
             <div className="io-body">
-              {execution.output.stdout ? (
-                <pre>{execution.output.stdout}</pre>
+              {activeOutputTab === "stdout" ? (
+                execution.output.stdout ? (
+                  <pre>{execution.output.stdout}</pre>
+                ) : (
+                  <span className="empty">empty</span>
+                )
               ) : (
-                <span className="empty">empty</span>
-              )}
-            </div>
-          </div>
-
-          <div className="io-pane">
-            <div className="io-header">
-              <span className="io-icon" style={{ color: "var(--red)" }}>!</span>stderr
-            </div>
-            <div className="io-body">
-              {execution.output.stderr ? (
-                <pre className="err">{execution.output.stderr}</pre>
-              ) : (
-                <span className="empty">empty</span>
+                execution.output.stderr ? (
+                  <pre className="err">{execution.output.stderr}</pre>
+                ) : (
+                  <span className="empty">empty</span>
+                )
               )}
             </div>
           </div>
