@@ -56,7 +56,7 @@ int main() {
     expect(result.error?.message).toMatch(/not declared/);
   });
 
-  it("uninitialized array element", () => {
+  it("fixed array element is zero-initialized", () => {
     const source = `
 int main() {
   int a[3];
@@ -65,9 +65,8 @@ int main() {
 }
 `;
     const result = compileAndRun(source);
-    expect(result.status).toBe("error");
-    expect(result.error?.message).toMatch(/Runtime Error:/);
-    expect(result.error?.message).toMatch(/uninitialized/);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("0\n");
   });
 
   it("array access out of bounds negative", () => {
