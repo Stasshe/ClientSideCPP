@@ -567,6 +567,8 @@ export function buildDebugInfoView(
   scopeStack: Scope[],
   globals: Scope,
   arrays: Map<number, ArrayStore>,
+  inputTokens: string[],
+  inputIndex: number,
   serializeScope: (scope: Scope) => DebugValueView[],
   serializeValue: (value: RuntimeValue) => string,
 ): DebugInfo {
@@ -588,5 +590,9 @@ export function buildDebugInfoView(
       values: store.values.map((value) => serializeValue(value)),
     })),
     watchList: [],
+    input: {
+      tokens: [...inputTokens],
+      nextIndex: inputIndex,
+    },
   };
 }

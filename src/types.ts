@@ -284,6 +284,11 @@ export type WatchView = {
   value: string;
 };
 
+export type InputStateView = {
+  tokens: string[];
+  nextIndex: number;
+};
+
 export type DebugInfo = {
   currentLine: number;
   callStack: FrameView[];
@@ -291,6 +296,7 @@ export type DebugInfo = {
   globalVars: DebugValueView[];
   arrays: ArrayView[];
   watchList: WatchView[];
+  input: InputStateView;
 };
 
 export type RunStatus = "done" | "paused" | "error";
@@ -318,6 +324,7 @@ export type DebugState = {
   globalVars: DebugValueView[];
   arrays: ArrayView[];
   watchList: WatchView[];
+  input: InputStateView;
   stepCount: number;
   pauseReason: "step" | "breakpoint" | null;
 };

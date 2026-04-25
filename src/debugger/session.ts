@@ -15,23 +15,28 @@ export class DebugSession {
 
   private readonly breakpoints = new Set<number>();
 
-  private state: DebugState = {
-    status: "ready",
-    currentLine: 1,
-    callStack: [],
-    output: { stdout: "", stderr: "" },
-    error: null,
-    localVars: [],
-    globalVars: [],
-    arrays: [],
-    watchList: [],
-    stepCount: 0,
-    pauseReason: null,
-  };
+  private state: DebugState;
 
   constructor(source: string, input = "") {
     this.source = source;
     this.input = input;
+    this.state = {
+      status: "ready",
+      currentLine: 1,
+      callStack: [],
+      output: { stdout: "", stderr: "" },
+      error: null,
+      localVars: [],
+      globalVars: [],
+      arrays: [],
+      watchList: [],
+      input: {
+        tokens: this.tokenizeInput(input),
+        nextIndex: 0,
+      },
+      stepCount: 0,
+      pauseReason: null,
+    };
   }
 
   setBreakpoint(line: number): DebugState {
@@ -95,6 +100,10 @@ export class DebugSession {
         globalVars: [],
         arrays: [],
         watchList: [],
+        input: {
+          tokens: this.tokenizeInput(this.input),
+          nextIndex: 0,
+        },
         stepCount: 0,
         pauseReason: null,
       };
@@ -148,5 +157,12 @@ export class DebugSession {
 
     this.state = buildDebugState(result, pauseReason, result.stepCount);
     return this.state;
+  }
+
+  private tokenizeInput(input: string): string[] {
+    return input
+      .split(/\s+/)
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
   }
 }

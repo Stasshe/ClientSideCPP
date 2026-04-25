@@ -91,6 +91,13 @@ const initialExecution: DebugState = {
   globalVars: [],
   arrays: [],
   watchList: [],
+  input: {
+    tokens: starterInput
+      .split(/\s+/)
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0),
+    nextIndex: 0,
+  },
   stepCount: 0,
   pauseReason: null,
 };
@@ -108,6 +115,10 @@ function cloneState(state: DebugState): DebugState {
     globalVars: state.globalVars.map((v) => ({ ...v })),
     arrays: state.arrays.map((a) => ({ ...a, values: [...a.values] })),
     watchList: state.watchList.map((w) => ({ ...w })),
+    input: {
+      tokens: [...state.input.tokens],
+      nextIndex: state.input.nextIndex,
+    },
   };
 }
 
@@ -639,6 +650,28 @@ export function Playground() {
         )}
 
         <div className="debug-scroll">
+          <div className="dbg-section">
+            <div className="dbg-header">
+              Input
+              <span className="count">
+                {execution.input.nextIndex}/{execution.input.tokens.length}
+              </span>
+            </div>
+            {execution.input.tokens.length === 0 ? (
+              <div className="empty-row">No stdin tokens</div>
+            ) : (
+              <div className="runtime-input-wrap">
+                <textarea
+                  readOnly
+                  spellCheck={false}
+                  className="runtime-input"
+                  aria-label="runtime input state"
+                  value={execution.input.tokens.slice(execution.input.nextIndex).join(" ")}
+                />
+              </div>
+            )}
+          </div>
+
           <div className="dbg-section">
             <div className="dbg-header">
               Call Stack

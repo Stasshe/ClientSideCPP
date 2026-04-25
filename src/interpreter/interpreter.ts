@@ -315,6 +315,8 @@ class Interpreter extends InterpreterEvaluator {
       this.scopeStack,
       this.globals,
       this.arrays,
+      this.inputTokens,
+      this.inputIndex,
       this.serializeScope.bind(this),
       this.serializeValue.bind(this),
     );
@@ -337,6 +339,7 @@ export function buildDebugState(
     globalVars: result.debugInfo.globalVars,
     arrays: result.debugInfo.arrays,
     watchList: result.debugInfo.watchList,
+    input: result.debugInfo.input,
     stepCount,
     pauseReason,
   };

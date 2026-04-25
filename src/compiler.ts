@@ -60,6 +60,13 @@ export function compileAndRun(source: string, input = "", filename = "<input>"):
         globalVars: [],
         arrays: [],
         watchList: [],
+        input: {
+          tokens: input
+            .split(/\s+/)
+            .map((v) => v.trim())
+            .filter((v) => v.length > 0),
+          nextIndex: 0,
+        },
       },
       stepCount: 0,
     };

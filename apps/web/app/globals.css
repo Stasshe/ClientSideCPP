@@ -188,6 +188,23 @@ pre, code, textarea { font-family: var(--font-mono); }
 .stack-fn { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stack-line { color: var(--text-dim); font-size: 10px; flex-shrink: 0; }
 
+.runtime-input-wrap {
+  padding: 6px 8px 8px;
+}
+.runtime-input {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--text);
+  resize: none;
+  outline: none;
+  font-size: 12px;
+  line-height: 1.5;
+  font-family: var(--font-mono);
+  padding: 6px 8px;
+}
+
 /* Variables */
 .var-scope {
   padding: 2px 0;
