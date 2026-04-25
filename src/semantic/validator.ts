@@ -425,11 +425,22 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
     case "AssignExpr": {
       const targetType = inferLValueType(expr.target, context);
       const valueType = validateExpr(expr.value, context, targetType ?? undefined);
-      if (expr.operator !== "=" && targetType !== null && !isNumericType(targetType)) {
-        pushError(context, expr.line, expr.col, "type mismatch: expected numeric");
-      }
-      if (expr.operator !== "=" && valueType !== null && !isNumericType(valueType)) {
-        pushError(context, expr.line, expr.col, "type mismatch: expected numeric");
+      if (expr.operator !== "=") {
+        if (targetType !== null && isPointerType(targetType)) {
+          if (expr.operator !== "+=" && expr.operator !== "-=") {
+            pushError(context, expr.line, expr.col, "type mismatch: expected numeric");
+          }
+          if (valueType !== null && !isIntType(valueType)) {
+            pushError(context, expr.line, expr.col, "type mismatch: expected int");
+          }
+        } else {
+          if (targetType !== null && !isNumericType(targetType)) {
+            pushError(context, expr.line, expr.col, "type mismatch: expected numeric");
+          }
+          if (valueType !== null && !isNumericType(valueType)) {
+            pushError(context, expr.line, expr.col, "type mismatch: expected numeric");
+          }
+        }
       }
       return targetType;
     }
@@ -458,10 +469,12 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
       if (!isAssignableExpr(expr.operand)) {
         pushError(context, expr.line, expr.col, "increment/decrement target must be a variable");
       }
-      if (operandType !== null && !isIntType(operandType)) {
-        pushError(context, expr.line, expr.col, "type mismatch: expected int");
+      if (operandType !== null && !isIntType(operandType) && !isPointerType(operandType)) {
+        pushError(context, expr.line, expr.col, "type mismatch: expected int or pointer");
       }
-      return { kind: "PrimitiveType", name: "int" };
+      return operandType !== null && isPointerType(operandType)
+        ? operandType
+        : { kind: "PrimitiveType", name: "int" };
     }
     case "BinaryExpr": {
       const left = inferExprType(expr.left, context);
@@ -488,6 +501,27 @@ function inferBinaryType(
   right: TypeNode | null,
   context: ValidationContext,
 ): TypeNode | null {
+  if (expr.operator === "+") {
+    if (left !== null && right !== null && isPointerType(left) && isIntType(right)) {
+      return left;
+    }
+    if (left !== null && right !== null && isIntType(left) && isPointerType(right)) {
+      return right;
+    }
+  }
+
+  if (expr.operator === "-") {
+    if (left !== null && right !== null && isPointerType(left) && isIntType(right)) {
+      return left;
+    }
+    if (left !== null && right !== null && isPointerType(left) && isPointerType(right)) {
+      if (!sameType(left, right)) {
+        pushError(context, expr.line, expr.col, "type mismatch in pointer subtraction");
+      }
+      return { kind: "PrimitiveType", name: "int" };
+    }
+  }
+
   if (expr.operator === "&&" || expr.operator === "||") {
     if (left !== null && !isBoolType(left)) {
       pushError(context, expr.left.line, expr.left.col, "type mismatch: expected bool");

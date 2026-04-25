@@ -777,6 +777,12 @@ export abstract class InterpreterRuntime {
         if (store === undefined) {
           this.fail("invalid array reference", line);
         }
+        if (location.index < 0 || location.index >= store.values.length) {
+          this.fail(
+            `index ${location.index.toString()} out of range for array of size ${store.values.length}`,
+            line,
+          );
+        }
         const value = store.values[location.index];
         if (value === undefined) {
           this.fail("invalid index access", line);
@@ -817,6 +823,12 @@ export abstract class InterpreterRuntime {
         const store = this.arrays.get(location.ref);
         if (store === undefined) {
           this.fail("invalid array reference", line);
+        }
+        if (location.index < 0 || location.index >= store.values.length) {
+          this.fail(
+            `index ${location.index.toString()} out of range for array of size ${store.values.length}`,
+            line,
+          );
         }
         store.values[location.index] = this.castToElementType(value, location.type, line);
         return;

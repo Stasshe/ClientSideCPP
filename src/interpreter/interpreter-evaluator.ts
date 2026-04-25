@@ -94,18 +94,22 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         if (!this.isAssignableTarget(expr.operand)) {
           this.fail("increment/decrement target must be a variable", expr.line);
         }
-        const current = this.expectInt(
-          this.readLocation(this.resolveAssignTargetLocation(expr.operand, expr.line), expr.line),
-          expr.line,
-        );
+        const targetLocation = this.resolveAssignTargetLocation(expr.operand, expr.line);
+        const currentValue = this.readLocation(targetLocation, expr.line);
+        if (currentValue.kind === "pointer") {
+          const pointerDelta = expr.operator === "++" ? 1n : -1n;
+          const nextPointer = this.offsetPointer(currentValue, pointerDelta, expr.line);
+          this.writeLocation(targetLocation, nextPointer, expr.line);
+          return expr.isPostfix ? currentValue : nextPointer;
+        }
         const delta = expr.operator === "++" ? 1n : -1n;
-        const updated: RuntimeValue = { kind: "int", value: current.value + delta };
-        this.writeLocation(
-          this.resolveAssignTargetLocation(expr.operand, expr.line),
-          updated,
-          expr.line,
-        );
-        return expr.isPostfix ? current : updated;
+        const numericCurrent = this.expectInt(currentValue, expr.line);
+        const numericUpdated: RuntimeValue = {
+          kind: "int",
+          value: numericCurrent.value + delta,
+        };
+        this.writeLocation(targetLocation, numericUpdated, expr.line);
+        return expr.isPostfix ? numericCurrent : numericUpdated;
       }
       case "BinaryExpr":
         return this.evaluateBinary(expr);
@@ -280,6 +284,13 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
   ): RuntimeValue {
     if (operator === "=") {
       return this.assignWithCurrentType(current, rightValue, line);
+    }
+    if (current.kind === "pointer") {
+      if (operator !== "+=" && operator !== "-=") {
+        this.fail("type mismatch: expected numeric", line);
+      }
+      const delta = this.expectInt(rightValue, line).value;
+      return this.offsetPointer(current, operator === "+=" ? delta : -delta, line);
     }
     const left = this.expectInt(current, line);
     const right = this.expectInt(rightValue, line);
@@ -470,6 +481,16 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
       }
     }
 
+    const pointerArithmeticResult = this.tryEvaluatePointerArithmetic(
+      expr.operator,
+      left,
+      right,
+      expr.line,
+    );
+    if (pointerArithmeticResult !== null) {
+      return pointerArithmeticResult;
+    }
+
     const numeric = toNumericOperands(left, right, expr.line, this.fail.bind(this));
     if (numeric.mode === "double") {
       switch (expr.operator) {
@@ -515,6 +536,104 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
       this.fail("shift count must be non-negative", line);
     }
     return value;
+  }
+
+  private tryEvaluatePointerArithmetic(
+    operator: BinaryExprNode["operator"],
+    left: Exclude<RuntimeValue, { kind: "void" | "uninitialized" }>,
+    right: Exclude<RuntimeValue, { kind: "void" | "uninitialized" }>,
+    line: number,
+  ): RuntimeValue | null {
+    if (operator === "+") {
+      if (left.kind === "pointer" && right.kind === "int") {
+        return this.offsetPointer(left, right.value, line);
+      }
+      if (left.kind === "int" && right.kind === "pointer") {
+        return this.offsetPointer(right, left.value, line);
+      }
+      return null;
+    }
+
+    if (operator === "-") {
+      if (left.kind === "pointer" && right.kind === "int") {
+        return this.offsetPointer(left, -right.value, line);
+      }
+      if (left.kind === "pointer" && right.kind === "pointer") {
+        const diff = this.diffPointers(left, right, line);
+        return { kind: "int", value: diff };
+      }
+      return null;
+    }
+
+    return null;
+  }
+
+  private offsetPointer(
+    pointer: Extract<RuntimeValue, { kind: "pointer" }>,
+    offset: bigint,
+    line: number,
+  ): RuntimeValue {
+    if (pointer.target === null) {
+      this.fail("pointer arithmetic on null pointer", line);
+    }
+    const target = pointer.target;
+    if (target.kind === "array") {
+      const nextIndex = target.index + Number(offset);
+      return {
+        kind: "pointer",
+        pointeeType: pointer.pointeeType,
+        target: {
+          kind: "array",
+          ref: target.ref,
+          index: nextIndex,
+          type: target.type,
+        },
+      };
+    }
+    if (target.kind === "string") {
+      const nextIndex = target.index + Number(offset);
+      return {
+        kind: "pointer",
+        pointeeType: pointer.pointeeType,
+        target: {
+          kind: "string",
+          parent: target.parent,
+          index: nextIndex,
+        },
+      };
+    }
+    if (offset === 0n) {
+      return pointer;
+    }
+    this.fail("pointer arithmetic requires pointer to array/string element", line);
+  }
+
+  private diffPointers(
+    left: Extract<RuntimeValue, { kind: "pointer" }>,
+    right: Extract<RuntimeValue, { kind: "pointer" }>,
+    line: number,
+  ): bigint {
+    if (left.target === null || right.target === null) {
+      this.fail("pointer subtraction requires non-null pointers", line);
+    }
+    const leftTarget = left.target;
+    const rightTarget = right.target;
+
+    if (leftTarget.kind === "array" && rightTarget.kind === "array") {
+      if (leftTarget.ref !== rightTarget.ref) {
+        this.fail("pointer subtraction requires pointers into the same array", line);
+      }
+      return BigInt(leftTarget.index - rightTarget.index);
+    }
+
+    if (leftTarget.kind === "string" && rightTarget.kind === "string") {
+      if (!sameLocation(leftTarget.parent, rightTarget.parent)) {
+        this.fail("pointer subtraction requires pointers into the same string", line);
+      }
+      return BigInt(leftTarget.index - rightTarget.index);
+    }
+
+    this.fail("pointer subtraction requires compatible pointers", line);
   }
 
   private applyCompoundAssign(
@@ -695,10 +814,8 @@ function compareValues(
       );
     case "array":
       fail("array comparison is not supported", line);
-      return false;
     case "reference":
       fail("reference comparison is not supported", line);
-      return false;
   }
 }
 

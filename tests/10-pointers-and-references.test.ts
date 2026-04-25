@@ -134,4 +134,83 @@ int main() {
     expect(result.status).toBe("done");
     expect(result.output.stdout).toBe("azc\n");
   });
+
+  it("supports pointer addition and subtraction on array elements", () => {
+    const source = `
+int main() {
+  int a[4] = {10, 20, 30, 40};
+  int *p = &a[0];
+  int *q = p + 2;
+  cout << *q << "\\n";
+  q = q - 1;
+  cout << *q << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("30\n20\n");
+  });
+
+  it("supports pointer increment and decrement", () => {
+    const source = `
+int main() {
+  int a[3] = {5, 6, 7};
+  int *p = &a[0];
+  p++;
+  cout << *p << "\\n";
+  --p;
+  cout << *p << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("6\n5\n");
+  });
+
+  it("supports pointer subtraction result as distance", () => {
+    const source = `
+int main() {
+  int a[5] = {1, 2, 3, 4, 5};
+  int *p = &a[4];
+  int *q = &a[1];
+  cout << (p - q) << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("3\n");
+  });
+
+  it("fails pointer subtraction for different arrays", () => {
+    const source = `
+int main() {
+  int a[2] = {1, 2};
+  int b[2] = {3, 4};
+  int *p = &a[1];
+  int *q = &b[0];
+  cout << (p - q) << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("error");
+    expect(result.error?.message).toMatch(/same array/);
+  });
+
+  it("fails pointer arithmetic on scalar pointer", () => {
+    const source = `
+int main() {
+  int x = 10;
+  int *p = &x;
+  p = p + 1;
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("error");
+    expect(result.error?.message).toMatch(/pointer to array\/string element/);
+  });
 });
