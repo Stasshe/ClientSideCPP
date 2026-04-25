@@ -1,10 +1,4 @@
-import type {
-  AssignExprNode,
-  BinaryExprNode,
-  ExprNode,
-  Token,
-  UnaryExprNode,
-} from "../types";
+import type { AssignExprNode, BinaryExprNode, ExprNode, UnaryExprNode } from "../types";
 import { BaseParser, isAssignTarget } from "./base-parser";
 
 export abstract class ExpressionParser extends BaseParser {
@@ -26,8 +20,7 @@ export abstract class ExpressionParser extends BaseParser {
       }
 
       const segment = this.tokens.slice(this.index, endIndex);
-      const eof =
-        this.tokens[endIndex] ??
+      const eof = this.tokens[endIndex] ??
         this.tokens[this.tokens.length - 1] ?? {
           kind: "eof" as const,
           text: "<eof>",

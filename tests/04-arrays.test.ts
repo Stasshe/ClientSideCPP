@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { compileAndRun } from "./test-helper";
 
 describe("Arrays", () => {
@@ -153,6 +153,35 @@ int main() {
   int arr[3] = {1, 2, 3};
   incrementArray(arr, 3);
   cout << arr[0] << " " << arr[1] << " " << arr[2] << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("2 3 4\n");
+  });
+
+  it("multidimensional fixed array indexing", () => {
+    const source = `
+int main() {
+  int dp[2][3];
+  dp[0][0] = 1;
+  dp[0][1] = 2;
+  dp[1][2] = 7;
+  cout << dp[0][0] + dp[0][1] + dp[1][2] << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("10\n");
+  });
+
+  it("multidimensional fixed array flat initializer", () => {
+    const source = `
+int main() {
+  int a[2][2] = {1, 2, 3, 4};
+  cout << a[0][1] << " " << a[1][0] << " " << a[1][1] << "\\n";
   return 0;
 }
 `;

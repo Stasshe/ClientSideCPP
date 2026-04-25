@@ -7,12 +7,12 @@ export type PrimitiveTypeNode = {
 
 export type ArrayTypeNode = {
   kind: "ArrayType";
-  elementType: PrimitiveTypeNode;
+  elementType: TypeNode;
 };
 
 export type VectorTypeNode = {
   kind: "VectorType";
-  elementType: PrimitiveTypeNode;
+  elementType: TypeNode;
 };
 
 export type TypeNode = PrimitiveTypeNode | ArrayTypeNode | VectorTypeNode;
@@ -89,7 +89,7 @@ export type ArrayDeclNode = NodeBase & {
   kind: "ArrayDecl";
   type: ArrayTypeNode;
   name: string;
-  size: bigint;
+  dimensions: bigint[];
   initializers: ExprNode[];
 };
 
@@ -279,7 +279,7 @@ export type ScopeView = {
 
 export type ArrayView = {
   ref: number;
-  elementType: "int" | "double" | "bool" | "string";
+  elementType: string;
   dynamic: boolean;
   values: string[];
 };
@@ -348,11 +348,11 @@ export function primitiveType(name: PrimitiveTypeName): PrimitiveTypeNode {
   return { kind: "PrimitiveType", name };
 }
 
-export function arrayType(elementType: PrimitiveTypeNode): ArrayTypeNode {
+export function arrayType(elementType: TypeNode): ArrayTypeNode {
   return { kind: "ArrayType", elementType };
 }
 
-export function vectorType(elementType: PrimitiveTypeNode): VectorTypeNode {
+export function vectorType(elementType: TypeNode): VectorTypeNode {
   return { kind: "VectorType", elementType };
 }
 
@@ -373,8 +373,8 @@ export function typeToString(type: TypeNode): string {
     case "PrimitiveType":
       return type.name;
     case "ArrayType":
-      return `${type.elementType.name}[]`;
+      return `${typeToString(type.elementType)}[]`;
     case "VectorType":
-      return `vector<${type.elementType.name}>`;
+      return `vector<${typeToString(type.elementType)}>`;
   }
 }

@@ -214,13 +214,16 @@ function stripConstKeyword(line: string): string {
 }
 
 function normalizeScientificIntegerLiterals(line: string): string {
-  return line.replace(/\b(\d+)[eE]\+?(\d+)\b/g, (_match, baseText: string, exponentText: string) => {
-    const exponent = Number(exponentText);
-    if (!Number.isInteger(exponent) || exponent < 0 || exponent > 18) {
-      return _match;
-    }
-    return `${baseText}${"0".repeat(exponent)}`;
-  });
+  return line.replace(
+    /\b(\d+)[eE]\+?(\d+)\b/g,
+    (_match, baseText: string, exponentText: string) => {
+      const exponent = Number(exponentText);
+      if (!Number.isInteger(exponent) || exponent < 0 || exponent > 18) {
+        return _match;
+      }
+      return `${baseText}${"0".repeat(exponent)}`;
+    },
+  );
 }
 
 function readStringLiteral(line: string, start: number): { text: string; nextIndex: number } {

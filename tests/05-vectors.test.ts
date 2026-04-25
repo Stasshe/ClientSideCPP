@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { compileAndRun } from "./test-helper";
 
 describe("Vectors", () => {
@@ -180,6 +180,22 @@ int main() {
     const result = compileAndRun(source);
     expect(result.status).toBe("done");
     expect(result.output.stdout).toBe("hello world\n");
+  });
+
+  it("nested vectors support multidimensional indexing", () => {
+    const source = `
+int main() {
+  vector<vector<int>> g(2);
+  g[0].push_back(3);
+  g[0].push_back(4);
+  g[1].push_back(5);
+  cout << g[0][1] + g[1][0] << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("9\n");
   });
 
   it("builtins abs max min swap", () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { compileAndRun } from "./test-helper";
 
 describe("Control Flow", () => {
@@ -115,9 +115,7 @@ int main() {
 `;
     const result = compileAndRun(source);
     expect(result.status).toBe("done");
-    expect(result.output.stdout).toBe(
-      "0 0\n0 1\n0 2\n1 0\n1 1\n1 2\n"
-    );
+    expect(result.output.stdout).toBe("0 0\n0 1\n0 2\n1 0\n1 1\n1 2\n");
   });
 
   it("logical AND operator", () => {

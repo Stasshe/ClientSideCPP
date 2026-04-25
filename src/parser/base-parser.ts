@@ -51,9 +51,12 @@ export abstract class BaseParser {
         break;
       }
       let paramType = type;
-      if (isPrimitiveType(type) && type.name !== "void" && this.matchSymbol("[")) {
-        this.consumeSymbol("]", "expected ']' after array parameter");
-        paramType = arrayType(type);
+      if (!this.isVoidTypeNode(type) && this.checkSymbol("[")) {
+        const dimensions = this.parseArrayDimensions("parameter", false);
+        if (dimensions === null) {
+          break;
+        }
+        paramType = this.wrapArrayDimensions(type, dimensions.length);
       }
       params.push({
         kind: "Param",
@@ -141,7 +144,10 @@ export abstract class BaseParser {
       const group: DeclGroupStmtNode = {
         kind: "DeclGroupStmt",
         declarations,
-        ...this.rangeFromNode(first, declarations[declarations.length - 1] as VarDeclNode | ArrayDeclNode | VectorDeclNode),
+        ...this.rangeFromNode(
+          first,
+          declarations[declarations.length - 1] as VarDeclNode | ArrayDeclNode | VectorDeclNode,
+        ),
       };
       return group;
     }
@@ -438,7 +444,10 @@ export abstract class BaseParser {
     return declarations;
   }
 
-  protected parseVarDeclaratorList(type: PrimitiveTypeNode, firstNameToken: Token): VarDeclNode[] | null {
+  protected parseVarDeclaratorList(
+    type: Extract<TypeNode, { kind: "PrimitiveType" }>,
+    firstNameToken: Token,
+  ): VarDeclNode[] | null {
     const declarations: VarDeclNode[] = [];
     const first = this.parseSingleVarDeclarator(type, firstNameToken);
     if (first === null) {
@@ -465,7 +474,7 @@ export abstract class BaseParser {
     type: TypeNode,
     nameToken: Token,
   ): VarDeclNode | ArrayDeclNode | VectorDeclNode | null {
-    if (this.matchSymbol("[")) {
+    if (this.checkSymbol("[")) {
       return this.finishArrayDecl(type, nameToken, false);
     }
     if (type.kind === "VectorType") {
@@ -478,7 +487,10 @@ export abstract class BaseParser {
     return this.parseSingleVarDeclarator(type, nameToken);
   }
 
-  protected parseSingleVarDeclarator(type: PrimitiveTypeNode, nameToken: Token): VarDeclNode | null {
+  protected parseSingleVarDeclarator(
+    type: Extract<TypeNode, { kind: "PrimitiveType" }>,
+    nameToken: Token,
+  ): VarDeclNode | null {
     const initializer = this.matchSymbol("=") ? this.parseExpression() : null;
     return {
       kind: "VarDecl",
@@ -491,22 +503,22 @@ export abstract class BaseParser {
     };
   }
 
-  protected finishArrayDecl(type: TypeNode, nameToken: Token, consumeTerminator = true): ArrayDeclNode | null {
-    if (!isPrimitiveType(type)) {
-      this.errorAt(nameToken, "array element type must be primitive");
-      return null;
-    }
-    if (type.name === "void") {
+  protected finishArrayDecl(
+    type: TypeNode,
+    nameToken: Token,
+    consumeTerminator = true,
+  ): ArrayDeclNode | null {
+    if (this.isVoidTypeNode(type)) {
       this.errorAt(nameToken, "array element type cannot be void");
       return null;
     }
 
-    const sizeToken = this.consume("number", "expected array size integer literal");
-    if (sizeToken === null) {
+    const dimensions = this.parseArrayDimensions("array", true);
+    if (dimensions === null) {
       return null;
     }
-
-    if (!this.consumeSymbol("]", "expected ']' after array size")) {
+    if (dimensions.length === 0) {
+      this.errorAt(nameToken, "expected array size integer literal");
       return null;
     }
 
@@ -534,9 +546,9 @@ export abstract class BaseParser {
 
     return {
       kind: "ArrayDecl",
-      type: arrayType(type),
+      type: this.wrapArrayDimensions(type, dimensions.length),
       name: nameToken.text,
-      size: BigInt(sizeToken.text),
+      dimensions,
       initializers,
       ...this.rangeToPrevious(nameToken),
     };
@@ -587,15 +599,15 @@ export abstract class BaseParser {
     if (!this.consumeSymbol("<", "expected '<' after vector")) {
       return null;
     }
-    const elementType = this.parsePrimitiveType();
+    const elementType = this.parseType();
     if (elementType === null) {
       return null;
     }
-    if (elementType.name === "void") {
+    if (this.isVoidTypeNode(elementType)) {
       this.errorAtCurrent("vector element type cannot be void");
       return null;
     }
-    if (!this.consumeSymbol(">", "expected '>' after vector element type")) {
+    if (!this.consumeTypeClose("expected '>' after vector element type")) {
       return null;
     }
     return vectorType(elementType);
@@ -725,7 +737,10 @@ export abstract class BaseParser {
     return this.tokens[Math.max(0, this.index - 1)] as Token;
   }
 
-  protected rangeFrom(start: Pick<Token, "line" | "col">, end: Pick<Token, "endLine" | "endCol">): SourceRange {
+  protected rangeFrom(
+    start: Pick<Token, "line" | "col">,
+    end: Pick<Token, "endLine" | "endCol">,
+  ): SourceRange {
     return {
       line: start.line,
       col: start.col,
@@ -738,7 +753,10 @@ export abstract class BaseParser {
     return this.rangeFrom(start, this.previous());
   }
 
-  protected rangeFromNode(start: Pick<Token, "line" | "col">, end: Pick<SourceRange, "endLine" | "endCol">): SourceRange {
+  protected rangeFromNode(
+    start: Pick<Token, "line" | "col">,
+    end: Pick<SourceRange, "endLine" | "endCol">,
+  ): SourceRange {
     return {
       line: start.line,
       col: start.col,
@@ -782,6 +800,66 @@ export abstract class BaseParser {
       }
       this.advance();
     }
+  }
+
+  private parseArrayDimensions(
+    contextName: "array" | "parameter",
+    requireSize: boolean,
+  ): bigint[] | null {
+    const dimensions: bigint[] = [];
+
+    while (this.matchSymbol("[")) {
+      if (this.checkSymbol("]")) {
+        if (requireSize) {
+          this.errorAtCurrent(`expected ${contextName} size integer literal`);
+          return null;
+        }
+        this.advance();
+        dimensions.push(0n);
+        continue;
+      }
+
+      const sizeToken = this.consume("number", `expected ${contextName} size integer literal`);
+      if (sizeToken === null) {
+        return null;
+      }
+      dimensions.push(BigInt(sizeToken.text));
+      if (!this.consumeSymbol("]", "expected ']' after array size")) {
+        return null;
+      }
+    }
+
+    return dimensions;
+  }
+
+  private wrapArrayDimensions(type: TypeNode, dimensions: number): ArrayDeclNode["type"] {
+    let wrapped: TypeNode = type;
+    for (let i = 0; i < dimensions; i += 1) {
+      wrapped = arrayType(wrapped);
+    }
+    return wrapped as ArrayDeclNode["type"];
+  }
+
+  private isVoidTypeNode(type: TypeNode): boolean {
+    return isPrimitiveType(type) && type.name === "void";
+  }
+
+  private consumeTypeClose(message: string): boolean {
+    this.splitShiftCloseToken();
+    return this.consumeSymbol(">", message);
+  }
+
+  private splitShiftCloseToken(): void {
+    const token = this.peek();
+    if (token.kind !== "symbol" || token.text !== ">>") {
+      return;
+    }
+    (this.tokens as Token[]).splice(
+      this.index,
+      1,
+      { ...token, text: ">", endCol: token.col + 1 },
+      { ...token, col: token.col + 1, endCol: token.endCol, text: ">" },
+    );
   }
 }
 

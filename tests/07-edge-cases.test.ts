@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { compileAndRun } from "./test-helper";
 
 describe("Edge Cases", () => {
@@ -402,6 +402,21 @@ int main() {
     const result = compileAndRun(source);
     expect(result.status).toBe("done");
     expect(result.output.stdout).toBe("hello world\n");
+  });
+
+  it("string indexing read and write", () => {
+    const source = `
+int main() {
+  string s = "abc";
+  cout << s[1] << "\\n";
+  s[1] = "z";
+  cout << s << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("b\nazc\n");
   });
 
   it("global variable initialization", () => {

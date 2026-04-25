@@ -1,11 +1,11 @@
-import type { PrimitiveTypeNode } from "../types";
+import type { PrimitiveTypeNode, TypeNode, VectorTypeNode } from "../types";
 
 export type RuntimeValue =
   | { kind: "int"; value: bigint }
   | { kind: "double"; value: number }
   | { kind: "bool"; value: boolean }
   | { kind: "string"; value: string }
-  | { kind: "array"; ref: number; elementType: "int" | "double" | "bool" | "string"; dynamic: boolean }
+  | { kind: "array"; ref: number; type: VectorTypeNode | Exclude<TypeNode, PrimitiveTypeNode> }
   | { kind: "void" }
   | { kind: "uninitialized"; expected: "int" | "double" | "bool" | "string" };
 
@@ -45,7 +45,9 @@ export function stringifyValue(value: RuntimeValue): string {
     case "bool":
       return value.value ? "1" : "0";
     case "double":
-      return Number.isInteger(value.value) ? value.value.toFixed(1).replace(/\.0$/, "") : value.value.toString();
+      return Number.isInteger(value.value)
+        ? value.value.toFixed(1).replace(/\.0$/, "")
+        : value.value.toString();
     case "string":
       return value.value;
     case "void":

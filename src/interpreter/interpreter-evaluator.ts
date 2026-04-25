@@ -33,7 +33,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         if (builtinResult !== null) {
           return builtinResult;
         }
-        this.fail(`'${expr.callee}' was not declared in this scope`, expr.line);
+        return this.fail(`'${expr.callee}' was not declared in this scope`, expr.line);
       }
       case "MethodCallExpr":
         return this.evaluateMethodCall(expr.receiver, expr.method, expr.args, expr.line);
@@ -114,7 +114,11 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
 
   protected abstract invokeFunction(fn: FunctionDeclNode, args: RuntimeValue[]): RuntimeValue;
 
-  private tryEvaluateBuiltinCall(callee: string, args: ExprNode[], line: number): RuntimeValue | null {
+  private tryEvaluateBuiltinCall(
+    callee: string,
+    args: ExprNode[],
+    line: number,
+  ): RuntimeValue | null {
     if (callee === "abs") {
       if (args.length !== 1) {
         this.fail("abs requires exactly 1 argument", line);
@@ -129,7 +133,10 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
       }
       const left = this.expectInt(this.evaluateExpr(args[0] as ExprNode), line).value;
       const right = this.expectInt(this.evaluateExpr(args[1] as ExprNode), line).value;
-      return { kind: "int", value: callee === "max" ? (left > right ? left : right) : left < right ? left : right };
+      return {
+        kind: "int",
+        value: callee === "max" ? (left > right ? left : right) : left < right ? left : right,
+      };
     }
 
     if (callee === "swap") {
@@ -197,7 +204,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
     if (store === undefined) {
       this.fail("invalid array reference", line);
     }
-    if (!store.dynamic) {
+    if (store.type.kind !== "VectorType") {
       this.fail(`method '${method}' is not supported for fixed array`, line);
     }
 
@@ -207,7 +214,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
       }
       const value = this.castToElementType(
         this.evaluateExpr(args[0] as ExprNode),
-        store.elementType,
+        store.type.elementType,
         line,
       );
       store.values.push(value);
@@ -271,7 +278,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         store.values = store.values.slice(0, targetSize);
       } else {
         while (store.values.length < targetSize) {
-          store.values.push(this.defaultPrimitiveValue(store.elementType));
+          store.values.push(this.defaultValueForType(store.type.elementType, line));
         }
       }
       return { kind: "void" };
@@ -281,8 +288,12 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
   }
 
   protected getIndexedValue(targetExpr: ExprNode, indexExpr: ExprNode, line: number): RuntimeValue {
-    const target = this.expectArray(this.evaluateExpr(targetExpr), line);
+    const targetValue = this.ensureInitialized(this.evaluateExpr(targetExpr), line, "value");
     const index = this.expectInt(this.evaluateExpr(indexExpr), line).value;
+    if (targetValue.kind === "string") {
+      return this.getStringIndexedValue(targetValue.value, index, line);
+    }
+    const target = this.expectArray(targetValue, line);
     const store = this.arrays.get(target.ref);
     if (store === undefined) {
       this.fail("invalid array reference", line);
@@ -306,8 +317,13 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
     value: RuntimeValue,
     line: number,
   ): void {
-    const target = this.expectArray(this.evaluateExpr(targetExpr), line);
+    const targetValue = this.ensureInitialized(this.evaluateExpr(targetExpr), line, "value");
     const index = this.expectInt(this.evaluateExpr(indexExpr), line).value;
+    if (targetValue.kind === "string") {
+      this.setStringIndexedValue(targetExpr, targetValue.value, index, value, line);
+      return;
+    }
+    const target = this.expectArray(targetValue, line);
     const store = this.arrays.get(target.ref);
     if (store === undefined) {
       this.fail("invalid array reference", line);
@@ -318,8 +334,58 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         line,
       );
     }
-    const assigned = this.castToElementType(value, store.elementType, line);
+    const assigned = this.castToElementType(value, store.type.elementType, line);
     store.values[Number(index)] = assigned;
+  }
+
+  private getStringIndexedValue(text: string, index: bigint, line: number): RuntimeValue {
+    if (index < 0n || index >= BigInt(text.length)) {
+      this.fail(`index ${index.toString()} out of range for string of size ${text.length}`, line);
+    }
+    return { kind: "string", value: text[Number(index)] ?? "" };
+  }
+
+  private setStringIndexedValue(
+    targetExpr: ExprNode,
+    current: string,
+    index: bigint,
+    value: RuntimeValue,
+    line: number,
+  ): void {
+    if (index < 0n || index >= BigInt(current.length)) {
+      this.fail(
+        `index ${index.toString()} out of range for string of size ${current.length}`,
+        line,
+      );
+    }
+    const assigned = this.castToStringElement(value, line);
+    const next = current.slice(0, Number(index)) + assigned + current.slice(Number(index) + 1);
+
+    if (targetExpr.kind === "Identifier") {
+      this.assign(targetExpr.name, { kind: "string", value: next }, line);
+      return;
+    }
+    if (targetExpr.kind === "IndexExpr") {
+      this.setIndexedValue(
+        targetExpr.target,
+        targetExpr.index,
+        { kind: "string", value: next },
+        line,
+      );
+      return;
+    }
+    this.fail("string index target must be assignable", line);
+  }
+
+  private castToStringElement(value: RuntimeValue, line: number): string {
+    const assigned = this.castToElementType(value, { kind: "PrimitiveType", name: "string" }, line);
+    if (assigned.kind !== "string") {
+      this.fail("cannot convert value to string", line);
+    }
+    if (assigned.value.length !== 1) {
+      this.fail("string element assignment requires a single character", line);
+    }
+    return assigned.value;
   }
 
   private evaluateBinary(expr: BinaryExprNode): RuntimeValue {
@@ -380,9 +446,15 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
 
       switch (expr.operator) {
         case "<<":
-          return { kind: "int", value: leftInt.value << this.normalizeShiftAmount(rightInt.value, expr.line) };
+          return {
+            kind: "int",
+            value: leftInt.value << this.normalizeShiftAmount(rightInt.value, expr.line),
+          };
         case ">>":
-          return { kind: "int", value: leftInt.value >> this.normalizeShiftAmount(rightInt.value, expr.line) };
+          return {
+            kind: "int",
+            value: leftInt.value >> this.normalizeShiftAmount(rightInt.value, expr.line),
+          };
         case "&":
           return { kind: "int", value: leftInt.value & rightInt.value };
         case "^":
@@ -483,7 +555,11 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
       if (fillArg === undefined) {
         this.fail("fill requires exactly 3 arguments", line);
       }
-      const fillValue = this.castToElementType(this.evaluateExpr(fillArg), store.elementType, line);
+      const fillValue = this.castToElementType(
+        this.evaluateExpr(fillArg),
+        store.type.elementType,
+        line,
+      );
       store.values = store.values.map(() => fillValue);
       return;
     }
@@ -498,11 +574,19 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
     args: ExprNode[],
     callee: "sort" | "reverse" | "fill",
     line: number,
-  ): { store: { values: RuntimeValue[]; elementType: "int" | "double" | "bool" | "string"; dynamic: boolean } } {
+  ): {
+    store: {
+      values: RuntimeValue[];
+      type: { kind: "VectorType"; elementType: import("../types").TypeNode };
+    };
+  } {
     const minArgs = callee === "fill" ? 3 : 2;
     const maxArgs = callee === "sort" ? 3 : callee === "fill" ? 3 : 2;
     if (args.length < minArgs || args.length > maxArgs) {
-      this.fail(`${callee} requires ${callee === "sort" ? "2 or 3" : callee === "fill" ? "exactly 3" : "exactly 2"} arguments`, line);
+      this.fail(
+        `${callee} requires ${callee === "sort" ? "2 or 3" : callee === "fill" ? "exactly 3" : "exactly 2"} arguments`,
+        line,
+      );
     }
 
     const beginExpr = args[0];
@@ -533,11 +617,16 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
     if (store === undefined) {
       this.fail("invalid array reference", line);
     }
-    if (!store.dynamic) {
+    if (store.type.kind !== "VectorType") {
       this.fail(`${callee} requires a vector range`, line);
     }
 
-    return { store };
+    return {
+      store: store as {
+        values: RuntimeValue[];
+        type: { kind: "VectorType"; elementType: import("../types").TypeNode };
+      },
+    };
   }
 
   private isDescendingSortComparator(expr: ExprNode | undefined, line: number): boolean {
@@ -569,9 +658,17 @@ function compareValues(
 
   switch (left.kind) {
     case "int":
-      return comparePrimitive(left.value, (right as { kind: "int"; value: bigint }).value, operator);
+      return comparePrimitive(
+        left.value,
+        (right as { kind: "int"; value: bigint }).value,
+        operator,
+      );
     case "double":
-      return comparePrimitive(left.value, (right as { kind: "double"; value: number }).value, operator);
+      return comparePrimitive(
+        left.value,
+        (right as { kind: "double"; value: number }).value,
+        operator,
+      );
     case "bool":
       return comparePrimitive(
         left.value,
@@ -682,7 +779,12 @@ function sortablePrimitive(
   line: number,
   fail: (message: string, line: number) => never,
 ): bigint | number | boolean | string {
-  if (value.kind === "int" || value.kind === "double" || value.kind === "bool" || value.kind === "string") {
+  if (
+    value.kind === "int" ||
+    value.kind === "double" ||
+    value.kind === "bool" ||
+    value.kind === "string"
+  ) {
     return value.value;
   }
   fail("sort/reverse/fill supports only primitive vector values", line);

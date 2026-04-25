@@ -3,7 +3,7 @@ import type { RuntimeValue } from "../runtime/value";
 import { stringifyValue } from "../runtime/value";
 import type {
   ArrayDeclNode,
-  ArrayView,
+  ArrayTypeNode,
   AssignTargetNode,
   DebugExecutionRange,
   DebugInfo,
@@ -13,20 +13,17 @@ import type {
   FunctionDeclNode,
   ProgramNode,
   RuntimeErrorInfo,
-  ScopeView,
   SourceRange,
   TypeNode,
   VectorDeclNode,
+  VectorTypeNode,
 } from "../types";
-import { isPrimitiveType } from "../types";
+import { isPrimitiveType, typeToString } from "../types";
 
 export type Scope = Map<string, RuntimeValue>;
-export type PrimitiveElementType = "int" | "double" | "bool" | "string";
-
 export type ArrayStore = {
-  elementType: PrimitiveElementType;
+  type: ArrayTypeNode | VectorTypeNode;
   values: RuntimeValue[];
-  dynamic: boolean;
 };
 
 export type InterpreterStepInfo = {
@@ -39,7 +36,7 @@ export type InterpreterStepInfo = {
 };
 
 export type InterpreterOptions = {
-  onStep?: (info: InterpreterStepInfo) => "pause" | void;
+  onStep?: (info: InterpreterStepInfo) => "pause" | undefined;
 };
 
 export class PauseTrap {
@@ -101,31 +98,17 @@ export abstract class InterpreterRuntime {
   protected abstract evaluateExpr(expr: ExprNode): RuntimeValue;
 
   protected defineArrayDecl(decl: ArrayDeclNode, scope: Scope): void {
-    if (decl.size < 0n) {
-      this.fail("array size must be non-negative", decl.line);
-    }
-
-    const sizeAsNumber = Number(decl.size);
-    const elementType = this.toElementType(decl.type.elementType, decl.line);
-    const values = Array.from({ length: sizeAsNumber }, () => this.defaultPrimitiveValue(elementType));
-
-    for (let i = 0; i < decl.initializers.length; i += 1) {
-      if (i >= values.length) {
-        this.fail("too many initializers for array", decl.line);
+    for (const dimension of decl.dimensions) {
+      if (dimension < 0n) {
+        this.fail("array size must be non-negative", decl.line);
       }
-      const init = decl.initializers[i];
-      if (init === undefined) {
-        continue;
-      }
-      values[i] = this.castToElementType(this.evaluateExpr(init), elementType, init.line);
     }
-
-    const arrayValue = this.allocateArray(elementType, false, values);
+    const arrayValue = this.createFixedArrayValue(decl.type, decl.dimensions, decl.line);
+    this.applyArrayInitializers(arrayValue, decl.initializers, decl.line);
     this.defineInScope(scope, decl.name, arrayValue, decl.line);
   }
 
   protected defineVectorDecl(decl: VectorDeclNode, scope: Scope): void {
-    const elementType = this.toElementType(decl.type.elementType, decl.line);
     const args = decl.constructorArgs.map((arg) => this.evaluateExpr(arg));
     let values: RuntimeValue[] = [];
 
@@ -134,19 +117,25 @@ export abstract class InterpreterRuntime {
       if (size < 0n) {
         this.fail("vector size must be non-negative", decl.line);
       }
-      values = Array.from({ length: Number(size) }, () => this.defaultPrimitiveValue(elementType));
+      values = Array.from({ length: Number(size) }, () =>
+        this.defaultValueForType(decl.type.elementType, decl.line),
+      );
     } else if (args.length === 2) {
       const size = this.expectInt(args[0] as RuntimeValue, decl.line).value;
       if (size < 0n) {
         this.fail("vector size must be non-negative", decl.line);
       }
-      const fillValue = this.castToElementType(args[1] as RuntimeValue, elementType, decl.line);
+      const fillValue = this.castToElementType(
+        args[1] as RuntimeValue,
+        decl.type.elementType,
+        decl.line,
+      );
       values = Array.from({ length: Number(size) }, () => fillValue);
     } else if (args.length > 2) {
       this.fail("too many arguments for vector constructor", decl.line);
     }
 
-    const vectorValue = this.allocateArray(elementType, true, values);
+    const vectorValue = this.allocateArray(decl.type, values);
     this.defineInScope(scope, decl.name, vectorValue, decl.line);
   }
 
@@ -158,7 +147,10 @@ export abstract class InterpreterRuntime {
     return initialized;
   }
 
-  protected expectDouble(value: RuntimeValue, line: number): Extract<RuntimeValue, { kind: "double" }> {
+  protected expectDouble(
+    value: RuntimeValue,
+    line: number,
+  ): Extract<RuntimeValue, { kind: "double" }> {
     const initialized = this.ensureInitialized(value, line, "value");
     if (initialized.kind !== "double") {
       this.fail("type mismatch: expected double", line);
@@ -188,7 +180,10 @@ export abstract class InterpreterRuntime {
     this.fail("cannot convert value to bool", line);
   }
 
-  protected expectArray(value: RuntimeValue, line: number): Extract<RuntimeValue, { kind: "array" }> {
+  protected expectArray(
+    value: RuntimeValue,
+    line: number,
+  ): Extract<RuntimeValue, { kind: "array" }> {
     const initialized = this.ensureInitialized(value, line, "value");
     if (initialized.kind !== "array") {
       this.fail("type mismatch: expected array/vector", line);
@@ -271,7 +266,11 @@ export abstract class InterpreterRuntime {
     this.setIndexedValue(target.target, target.index, value, line);
   }
 
-  protected abstract getIndexedValue(targetExpr: ExprNode, indexExpr: ExprNode, line: number): RuntimeValue;
+  protected abstract getIndexedValue(
+    targetExpr: ExprNode,
+    indexExpr: ExprNode,
+    line: number,
+  ): RuntimeValue;
 
   protected abstract setIndexedValue(
     targetExpr: ExprNode,
@@ -281,35 +280,39 @@ export abstract class InterpreterRuntime {
   ): void;
 
   protected allocateArray(
-    elementType: PrimitiveElementType,
-    dynamic: boolean,
+    type: ArrayTypeNode | VectorTypeNode,
     values: RuntimeValue[],
   ): RuntimeValue {
     const ref = this.nextArrayRef;
     this.nextArrayRef += 1;
-    this.arrays.set(ref, { elementType, values, dynamic });
-    return { kind: "array", ref, elementType, dynamic };
+    this.arrays.set(ref, { type, values });
+    return { kind: "array", ref, type };
   }
 
-  protected castToElementType(
-    value: RuntimeValue,
-    typeName: PrimitiveElementType,
-    line: number,
-  ): RuntimeValue {
-    return this.coerceRuntimeValue(typeName, value, line);
+  protected castToElementType(value: RuntimeValue, type: TypeNode, line: number): RuntimeValue {
+    return this.assertType(type, value, line);
   }
 
-  protected defaultPrimitiveValue(typeName: PrimitiveElementType): RuntimeValue {
-    if (typeName === "int") {
-      return { kind: "int", value: 0n };
+  protected defaultValueForType(type: TypeNode, line: number): RuntimeValue {
+    if (isPrimitiveType(type)) {
+      if (type.name === "int" || type.name === "long long") {
+        return { kind: "int", value: 0n };
+      }
+      if (type.name === "double") {
+        return { kind: "double", value: 0 };
+      }
+      if (type.name === "bool") {
+        return { kind: "bool", value: false };
+      }
+      if (type.name === "string") {
+        return { kind: "string", value: "" };
+      }
+      this.fail("element type cannot be void", line);
     }
-    if (typeName === "double") {
-      return { kind: "double", value: 0 };
+    if (type.kind === "VectorType") {
+      return this.allocateArray(type, []);
     }
-    if (typeName === "bool") {
-      return { kind: "bool", value: false };
-    }
-    return { kind: "string", value: "" };
+    this.fail("fixed array value requires dimensions", line);
   }
 
   protected defineInScope(scope: Scope, name: string, value: RuntimeValue, line: number): void {
@@ -411,16 +414,19 @@ export abstract class InterpreterRuntime {
       this.fail(`cannot convert '${value.kind}' to '${this.typeKindName(type)}'`, line);
     }
 
-    if (value.elementType !== this.toElementType(type.elementType, line)) {
-      this.fail(`cannot convert '${value.elementType}' to '${type.elementType.name}'`, line);
-    }
-
-    if (type.kind === "VectorType" && !value.dynamic) {
+    if (type.kind === "VectorType" && value.type.kind !== "VectorType") {
       this.fail("cannot convert 'array' to 'vector'", line);
     }
 
-    if (type.kind === "ArrayType" && value.dynamic) {
+    if (type.kind === "ArrayType" && value.type.kind !== "ArrayType") {
       this.fail("cannot convert 'vector' to 'array'", line);
+    }
+
+    if (!this.sameType(type.elementType, value.type.elementType)) {
+      this.fail(
+        `cannot convert '${this.typeToRuntimeString(value.type)}' to '${this.typeToRuntimeString(type)}'`,
+        line,
+      );
     }
 
     return value;
@@ -434,7 +440,11 @@ export abstract class InterpreterRuntime {
     return scope;
   }
 
-  protected step(location: SourceRange, kind: "statement" | "expression", level = kind === "statement" ? 1 : 2): void {
+  protected step(
+    location: SourceRange,
+    kind: "statement" | "expression",
+    level = kind === "statement" ? 1 : 2,
+  ): void {
     this.stepCount += 1;
     this.currentLine = location.line;
     this.currentExecutionRange = {
@@ -467,23 +477,6 @@ export abstract class InterpreterRuntime {
 
   protected fail(message: string, line: number): never {
     throw new RuntimeTrap(message, this.currentFunction, line);
-  }
-
-  protected toElementType(type: TypeNode, line: number): PrimitiveElementType {
-    const typeName = this.normalizePrimitiveType(type, line);
-    if (typeName === "int" || typeName === "long long") {
-      return "int";
-    }
-    if (typeName === "bool") {
-      return "bool";
-    }
-    if (typeName === "double") {
-      return "double";
-    }
-    if (typeName === "string") {
-      return "string";
-    }
-    this.fail("element type cannot be void", line);
   }
 
   protected expectPrimitiveType(
@@ -536,7 +529,7 @@ export abstract class InterpreterRuntime {
   protected serializeValue(value: RuntimeValue): string {
     switch (value.kind) {
       case "array":
-        return `<${value.dynamic ? "vector" : "array"}#${value.ref}>`;
+        return `<${value.type.kind === "VectorType" ? "vector" : "array"}#${value.ref}>`;
       case "uninitialized":
         return `<uninitialized:${value.expected}>`;
       default:
@@ -563,6 +556,90 @@ export abstract class InterpreterRuntime {
       return { kind: "int", value: BigInt(initialized.value) };
     }
     this.fail(`cannot convert '${initialized.kind}' to '${expected}'`, line);
+  }
+
+  private createFixedArrayValue(
+    type: ArrayTypeNode,
+    dimensions: bigint[],
+    line: number,
+  ): RuntimeValue {
+    const size = dimensions[0];
+    if (size === undefined) {
+      this.fail("missing array dimension", line);
+    }
+    const values = Array.from({ length: Number(size) }, () => {
+      if (type.elementType.kind === "ArrayType") {
+        return this.createFixedArrayValue(type.elementType, dimensions.slice(1), line);
+      }
+      return this.defaultValueForType(type.elementType, line);
+    });
+    return this.allocateArray(type, values);
+  }
+
+  private applyArrayInitializers(
+    target: RuntimeValue,
+    initializers: ExprNode[],
+    line: number,
+  ): void {
+    const flatTargets = this.flattenArrayElements(target, line);
+    if (initializers.length > flatTargets.length) {
+      this.fail("too many initializers for array", line);
+    }
+    for (let i = 0; i < initializers.length; i += 1) {
+      const init = initializers[i];
+      const targetSlot = flatTargets[i];
+      if (init === undefined || targetSlot === undefined) {
+        continue;
+      }
+      targetSlot.assign(this.evaluateExpr(init), init.line);
+    }
+  }
+
+  private flattenArrayElements(
+    target: RuntimeValue,
+    line: number,
+  ): Array<{ assign: (value: RuntimeValue, assignLine: number) => void }> {
+    const arrayValue = this.expectArray(target, line);
+    const store = this.arrays.get(arrayValue.ref);
+    if (store === undefined) {
+      this.fail("invalid array reference", line);
+    }
+    const slots: Array<{ assign: (value: RuntimeValue, assignLine: number) => void }> = [];
+    for (let i = 0; i < store.values.length; i += 1) {
+      if (store.type.elementType.kind === "ArrayType") {
+        const nested = store.values[i];
+        if (nested !== undefined) {
+          slots.push(...this.flattenArrayElements(nested, line));
+        }
+        continue;
+      }
+      slots.push({
+        assign: (value: RuntimeValue, assignLine: number) => {
+          store.values[i] = this.castToElementType(value, store.type.elementType, assignLine);
+        },
+      });
+    }
+    return slots;
+  }
+
+  private sameType(left: TypeNode, right: TypeNode): boolean {
+    if (left.kind !== right.kind) {
+      return false;
+    }
+    switch (left.kind) {
+      case "PrimitiveType":
+        return right.kind === "PrimitiveType" && left.name === right.name;
+      case "ArrayType":
+      case "VectorType":
+        if (right.kind === "PrimitiveType") {
+          return false;
+        }
+        return this.sameType(left.elementType, right.elementType);
+    }
+  }
+
+  private typeToRuntimeString(type: TypeNode): string {
+    return typeToString(type);
   }
 }
 
@@ -600,8 +677,8 @@ export function buildDebugInfoView(
     globalVars: serializeScope(globals),
     arrays: Array.from(arrays.entries()).map(([ref, store]) => ({
       ref,
-      elementType: store.elementType,
-      dynamic: store.dynamic,
+      elementType: typeToString(store.type.elementType),
+      dynamic: store.type.kind === "VectorType",
       values: store.values.map((value) => serializeValue(value)),
     })),
     watchList: [],

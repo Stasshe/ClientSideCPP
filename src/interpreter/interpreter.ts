@@ -9,8 +9,13 @@ import type {
   RuntimeErrorInfo,
   StatementNode,
 } from "../types";
-import { buildDebugInfoView, InterpreterOptions, PauseTrap, toRuntimeError } from "./interpreter-runtime";
 import { InterpreterEvaluator } from "./interpreter-evaluator";
+import {
+  buildDebugInfoView,
+  type InterpreterOptions,
+  PauseTrap,
+  toRuntimeError,
+} from "./interpreter-runtime";
 
 export type { InterpreterOptions, InterpreterStepInfo } from "./interpreter-runtime";
 
@@ -168,11 +173,7 @@ class Interpreter extends InterpreterEvaluator {
         const value =
           stmt.initializer === null
             ? uninitializedForType(this.expectPrimitiveType(stmt.type, stmt.line))
-            : this.assertType(
-                stmt.type,
-                this.evaluateExpr(stmt.initializer),
-                stmt.line,
-              );
+            : this.assertType(stmt.type, this.evaluateExpr(stmt.initializer), stmt.line);
         this.define(stmt.name, value);
         return;
       }
@@ -330,8 +331,7 @@ export function buildDebugState(
   stepCount: number,
 ): DebugState {
   return {
-    status:
-      result.status === "done" ? "done" : result.status === "paused" ? "paused" : "error",
+    status: result.status === "done" ? "done" : result.status === "paused" ? "paused" : "error",
     currentLine: result.debugInfo.currentLine,
     callStack: result.debugInfo.callStack,
     output: result.output,

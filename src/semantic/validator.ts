@@ -62,7 +62,10 @@ function collectFunctions(program: ProgramNode): {
   return { functions, errors };
 }
 
-function validateMainSignature(functions: Map<string, FunctionDeclNode>, context: ValidationContext): void {
+function validateMainSignature(
+  functions: Map<string, FunctionDeclNode>,
+  context: ValidationContext,
+): void {
   const main = functions.get("main");
   if (main === undefined) {
     return;
@@ -98,20 +101,9 @@ function validateParameterType(
   col: number,
   context: ValidationContext,
 ): void {
-  if (type.kind === "PrimitiveType") {
-    if (type.name === "void") {
-      pushError(context, line, col, "parameter type cannot be void");
-    }
+  if (containsVoid(type)) {
+    pushError(context, line, col, "parameter type cannot be void");
     return;
-  }
-
-  if (type.elementType.name === "void") {
-    pushError(
-      context,
-      line,
-      col,
-      `${type.kind === "ArrayType" ? "array" : "vector"} parameter element type cannot be void`,
-    );
   }
 }
 
@@ -211,7 +203,9 @@ function validateStatement(stmt: StatementNode, context: ValidationContext): voi
 }
 
 function validateDecl(
-  stmt: Extract<StatementNode, { kind: "VarDecl" | "ArrayDecl" | "VectorDecl" }> | ProgramNode["globals"][number],
+  stmt:
+    | Extract<StatementNode, { kind: "VarDecl" | "ArrayDecl" | "VectorDecl" }>
+    | ProgramNode["globals"][number],
   context: ValidationContext,
 ): void {
   switch (stmt.kind) {
@@ -232,16 +226,16 @@ function validateDecl(
       defineSymbol(stmt.name, stmt.type, stmt.line, stmt.col, context);
       return;
     case "ArrayDecl":
-      if (stmt.type.elementType.name === "void") {
+      if (containsVoid(stmt.type)) {
         pushError(context, stmt.line, stmt.col, "array element type cannot be void");
       }
       for (const init of stmt.initializers) {
-        validateExpr(init, context, stmt.type.elementType);
+        validateExpr(init, context, baseElementType(stmt.type));
       }
       defineSymbol(stmt.name, stmt.type, stmt.line, stmt.col, context);
       return;
     case "VectorDecl":
-      if (stmt.type.elementType.name === "void") {
+      if (containsVoid(stmt.type)) {
         pushError(context, stmt.line, stmt.col, "vector element type cannot be void");
       }
       if (stmt.constructorArgs.length >= 1) {
@@ -277,7 +271,12 @@ function validateReturn(
   }
 
   if (stmt.value === null) {
-    pushError(context, stmt.line, stmt.col, "return-statement with no value, in function returning non-void");
+    pushError(
+      context,
+      stmt.line,
+      stmt.col,
+      "return-statement with no value, in function returning non-void",
+    );
     return;
   }
 
@@ -339,10 +338,13 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
       if (targetType === null) {
         return null;
       }
+      if (isStringType(targetType)) {
+        return { kind: "PrimitiveType", name: "string" };
+      }
       if (targetType.kind === "ArrayType" || targetType.kind === "VectorType") {
         return targetType.elementType;
       }
-      pushError(context, expr.line, expr.col, "type mismatch: expected array/vector");
+      pushError(context, expr.line, expr.col, "type mismatch: expected array/vector/string");
       return null;
     }
     case "AssignExpr": {
@@ -394,7 +396,14 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
     case "CallExpr":
       return validateCall(expr.callee, expr.args, expr.line, expr.col, context);
     case "MethodCallExpr":
-      return validateMethodCall(expr.receiver, expr.method, expr.args, expr.line, expr.col, context);
+      return validateMethodCall(
+        expr.receiver,
+        expr.method,
+        expr.args,
+        expr.line,
+        expr.col,
+        context,
+      );
   }
 }
 
@@ -422,13 +431,24 @@ function inferBinaryType(
     expr.operator === ">" ||
     expr.operator === ">="
   ) {
-    if (left !== null && right !== null && !sameType(left, right) && !(isNumericType(left) && isNumericType(right))) {
+    if (
+      left !== null &&
+      right !== null &&
+      !sameType(left, right) &&
+      !(isNumericType(left) && isNumericType(right))
+    ) {
       pushError(context, expr.line, expr.col, "type mismatch in comparison");
     }
     return { kind: "PrimitiveType", name: "bool" };
   }
 
-  if (expr.operator === "+" && left !== null && right !== null && isStringType(left) && isStringType(right)) {
+  if (
+    expr.operator === "+" &&
+    left !== null &&
+    right !== null &&
+    isStringType(left) &&
+    isStringType(right)
+  ) {
     return { kind: "PrimitiveType", name: "string" };
   }
 
@@ -496,7 +516,9 @@ function validateCall(
   }
 
   pushError(context, line, col, `'${callee}' was not declared in this scope`);
-  args.forEach((arg) => validateExpr(arg, context));
+  for (const arg of args) {
+    validateExpr(arg, context);
+  }
   return null;
 }
 
@@ -541,7 +563,12 @@ function validateBuiltinCall(
           pushError(context, right.line, right.col, "swap arguments must be lvalues");
         }
         if (leftType !== null && rightType !== null && !isAssignable(rightType, leftType)) {
-          pushError(context, line, col, `cannot convert '${typeToString(rightType)}' to '${typeToString(leftType)}'`);
+          pushError(
+            context,
+            line,
+            col,
+            `cannot convert '${typeToString(rightType)}' to '${typeToString(leftType)}'`,
+          );
         }
       }
     } else if (right !== undefined) {
@@ -582,7 +609,13 @@ function validateRangeBuiltin(
     validateExpr(args[2] ?? null, context, rangeType?.elementType);
   } else if (callee === "sort" && args[2] !== undefined) {
     const comparator = args[2];
-    if (!(comparator.kind === "CallExpr" && comparator.callee === "greater" && comparator.args.length === 0)) {
+    if (
+      !(
+        comparator.kind === "CallExpr" &&
+        comparator.callee === "greater" &&
+        comparator.args.length === 0
+      )
+    ) {
       pushError(context, comparator.line, comparator.col, "unsupported sort comparator");
     }
   }
@@ -643,12 +676,16 @@ function validateMethodCall(
 ): TypeNode | null {
   const receiverType = inferExprType(receiver, context);
   if (receiverType === null) {
-    args.forEach((arg) => validateExpr(arg, context));
+    for (const arg of args) {
+      validateExpr(arg, context);
+    }
     return null;
   }
   if (receiverType.kind !== "VectorType") {
     pushError(context, line, col, "type mismatch: expected array/vector");
-    args.forEach((arg) => validateExpr(arg, context));
+    for (const arg of args) {
+      validateExpr(arg, context);
+    }
     return null;
   }
 
@@ -694,7 +731,9 @@ function validateMethodCall(
       return { kind: "PrimitiveType", name: "void" };
     default:
       pushError(context, line, col, `unknown vector method '${method}'`);
-      args.forEach((arg) => validateExpr(arg, context));
+      for (const arg of args) {
+        validateExpr(arg, context);
+      }
       return null;
   }
 }
@@ -765,11 +804,14 @@ function sameType(left: TypeNode, right: TypeNode): boolean {
     case "PrimitiveType":
       return left.name === (right as PrimitiveTypeNode).name;
     case "ArrayType":
-      return left.elementType.name === (right as Extract<TypeNode, { kind: "ArrayType" }>).elementType.name;
+      return sameType(
+        left.elementType,
+        (right as Extract<TypeNode, { kind: "ArrayType" }>).elementType,
+      );
     case "VectorType":
-      return (
-        left.elementType.name ===
-        (right as Extract<TypeNode, { kind: "VectorType" }>).elementType.name
+      return sameType(
+        left.elementType,
+        (right as Extract<TypeNode, { kind: "VectorType" }>).elementType,
       );
   }
 }
@@ -814,6 +856,20 @@ function isStringType(type: TypeNode): boolean {
 
 function isInputTargetType(type: TypeNode): boolean {
   return isPrimitiveType(type) && type.name !== "void";
+}
+
+function containsVoid(type: TypeNode): boolean {
+  if (isPrimitiveType(type)) {
+    return type.name === "void";
+  }
+  return containsVoid(type.elementType);
+}
+
+function baseElementType(type: TypeNode): TypeNode {
+  if (type.kind === "ArrayType") {
+    return baseElementType(type.elementType);
+  }
+  return type;
 }
 
 function sameReceiver(left: ExprNode, right: ExprNode): boolean {

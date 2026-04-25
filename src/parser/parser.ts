@@ -1,6 +1,6 @@
 import type { CompileResult, GlobalDeclNode, ProgramNode, Token } from "../types";
-import { ExpressionParser } from "./expression-parser";
 import { tokensStart } from "./base-parser";
+import { ExpressionParser } from "./expression-parser";
 
 export function parse(tokens: Token[]): CompileResult {
   const parser = new Parser(tokens);
@@ -14,7 +14,10 @@ class Parser extends ExpressionParser {
 
     while (!this.isAtEnd()) {
       if (this.matchKeyword("using")) {
-        const namespaceOkay = this.consumeKeyword("namespace", "expected 'namespace' after 'using'");
+        const namespaceOkay = this.consumeKeyword(
+          "namespace",
+          "expected 'namespace' after 'using'",
+        );
         const namespaceName = namespaceOkay
           ? this.consumeIdentifier("expected namespace name")
           : null;
@@ -22,7 +25,12 @@ class Parser extends ExpressionParser {
           namespaceName !== null &&
           namespaceName.text === "std" &&
           this.consumeSymbol(";", "expected ';' after using directive");
-        if (!namespaceOkay || namespaceName === null || namespaceName.text !== "std" || !semicolonOkay) {
+        if (
+          !namespaceOkay ||
+          namespaceName === null ||
+          namespaceName.text !== "std" ||
+          !semicolonOkay
+        ) {
           if (namespaceName !== null && namespaceName.text !== "std") {
             this.errorAt(namespaceName, "only 'using namespace std;' is supported");
           }

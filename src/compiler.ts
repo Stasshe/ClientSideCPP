@@ -38,7 +38,11 @@ export function runCompiled(program: ProgramNode, input = ""): RunResult {
   return runProgram(program, input);
 }
 
-export function formatRuntimeError(errorMessage: string, functionName: string, line: number): string {
+export function formatRuntimeError(
+  errorMessage: string,
+  functionName: string,
+  line: number,
+): string {
   return `Runtime Error: ${errorMessage}\n  at ${functionName}:${line}`;
 }
 
