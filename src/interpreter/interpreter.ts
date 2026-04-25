@@ -2,6 +2,7 @@ import { BreakSignal, ContinueSignal, ReturnSignal, RuntimeTrap } from "../runti
 import type { RuntimeValue } from "../runtime/value";
 import { defaultValueForType, stringifyValue, uninitializedForType } from "../runtime/value";
 import type {
+  DebugInfo,
   DebugState,
   FunctionDeclNode,
   ProgramNode,
@@ -29,6 +30,8 @@ export function runProgram(
 }
 
 class Interpreter extends InterpreterEvaluator {
+  private finalDebugInfo: DebugInfo | null = null;
+
   run(): RunResult {
     try {
       for (const fn of this.program.functions) {
@@ -52,7 +55,7 @@ class Interpreter extends InterpreterEvaluator {
         status: "done",
         output: this.output,
         error: null,
-        debugInfo: this.buildDebugInfo(),
+        debugInfo: this.finalDebugInfo ?? this.buildDebugInfo(),
         stepCount: this.stepCount,
       };
     } catch (error) {
@@ -103,12 +106,16 @@ class Interpreter extends InterpreterEvaluator {
 
     try {
       this.executeBlock(fn.body, false);
+      this.captureFinalDebugInfo(fn.name);
       this.scopeStack.pop();
       if (this.isVoidType(fn.returnType)) {
         return { kind: "void" };
       }
       return uninitializedForType(this.expectPrimitiveType(fn.returnType, fn.line));
     } catch (signal) {
+      if (signal instanceof ReturnSignal) {
+        this.captureFinalDebugInfo(fn.name);
+      }
       this.scopeStack.pop();
       if (signal instanceof ReturnSignal) {
         if (this.isVoidType(fn.returnType)) {
@@ -322,6 +329,17 @@ class Interpreter extends InterpreterEvaluator {
       this.serializeScope.bind(this),
       this.serializeValue.bind(this),
     );
+  }
+
+  private captureFinalDebugInfo(functionName: string): void {
+    // Run-to-end should show the program's final live state.
+    // After a normal function returns its frame is gone, so preserving it would
+    // show stale locals. main is the only intentional exception because program
+    // termination is defined by main finishing.
+    if (functionName !== "main") {
+      return;
+    }
+    this.finalDebugInfo = this.buildDebugInfo();
   }
 }
 

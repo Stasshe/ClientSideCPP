@@ -39,6 +39,8 @@ int main() {
     const done = session.run();
     expect(done.status).toBe("done");
     expect(done.output.stdout).toBe("3\n");
+    expect(done.callStack).toEqual([{ functionName: "main", line: 6 }]);
+    expect(done.localVars[0]?.vars).toEqual([{ name: "x", kind: "int", value: "3" }]);
   });
 
   it("stepOver executes function calls without entering the callee", () => {
@@ -117,6 +119,8 @@ int main() {
     const done = session.run();
     expect(done.status).toBe("done");
     expect(done.output.stdout).toBe("3\n");
+    expect(done.callStack).toEqual([{ functionName: "main", line: 7 }]);
+    expect(done.localVars[0]?.vars).toEqual([{ name: "x", kind: "int", value: "3" }]);
   });
 
   it("stepInto advances through cin targets one by one while stepOver keeps cin as one statement", () => {
