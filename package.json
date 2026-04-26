@@ -1,5 +1,5 @@
 {
-  "name": "web-cp-cpp",
+  "name": "webcp",
   "version": "0.0.0",
   "type": "module",
   "description": "",
@@ -28,7 +28,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Stasshe/ClientSideCPP"
+    "url": "https://github.com/Stasshe/WebCP"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",
