@@ -266,7 +266,7 @@ export abstract class InterpreterRuntimeSupport extends InterpreterRuntimeTypeSu
             line,
           );
         }
-        return { kind: "string", value: parent.value[location.index] ?? "" };
+        return { kind: "char", value: parent.value[location.index] ?? "\0" };
       }
     }
   }
@@ -328,9 +328,9 @@ export abstract class InterpreterRuntimeSupport extends InterpreterRuntimeTypeSu
         if (current.kind !== "string") {
           this.fail("type mismatch: expected string", line);
         }
-        const assigned = this.assertType({ kind: "PrimitiveType", name: "string" }, value, line);
-        if (assigned.kind !== "string" || assigned.value.length !== 1) {
-          this.fail("string element assignment requires a single character", line);
+        const assigned = this.assertType({ kind: "PrimitiveType", name: "char" }, value, line);
+        if (assigned.kind !== "char") {
+          this.fail("string element assignment requires char", line);
         }
         const next =
           current.value.slice(0, location.index) +

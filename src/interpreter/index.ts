@@ -407,7 +407,7 @@ class Interpreter extends InterpreterEvaluator {
       const parent = this.resolveAssignTargetLocation(source, line);
       return Array.from({ length: value.value.length }, (_unused, index) => ({
         kind: "reference",
-        type: { kind: "ReferenceType", referredType: { kind: "PrimitiveType", name: "string" } },
+        type: { kind: "ReferenceType", referredType: { kind: "PrimitiveType", name: "char" } },
         target: { kind: "string", parent, index },
       }));
     }

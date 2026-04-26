@@ -21,7 +21,7 @@ const INCLUDE_PATTERN = /^\s*#\s*include\s*<bits\/stdc\+\+\.h>\s*$/;
 const DEFINE_PATTERN = /^\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)(\(([^)]*)\))?\s*(.*)$/;
 const USING_ALIAS_PATTERN = /^\s*using\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;\s*$/;
 const CONST_DECL_PATTERN =
-  /^\s*const\s+(int|long\s+long|double|bool|string)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;\s*$/;
+  /^\s*const\s+(int|long\s+long|double|bool|char|string)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;\s*$/;
 
 export function preprocess(source: string): PreprocessResult {
   const macros = new Map<string, MacroDefinition>();

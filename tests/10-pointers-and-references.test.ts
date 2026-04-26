@@ -122,8 +122,8 @@ int main() {
 int main() {
   string s = "abc";
   for (auto& ch : s) {
-    if (ch == "b") {
-      ch = "z";
+    if (ch == 'b') {
+      ch = 'z';
     }
   }
   cout << s << "\\n";

@@ -305,6 +305,22 @@ int main() {
     expect(result.output.stdout).toBe("A\n");
   });
 
+  it("treats string indexing as char", () => {
+    const source = `
+int main() {
+  string s = "abc";
+  char c = s[1];
+  s[2] = 'z';
+  cout << c << "\\n";
+  cout << s << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("b\nabz\n");
+  });
+
   it("rejects multi-character char literal", () => {
     const source = `
 int main() {

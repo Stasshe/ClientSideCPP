@@ -405,7 +405,7 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
         return null;
       }
       if (isStringType(targetType)) {
-        return { kind: "PrimitiveType", name: "string" };
+        return { kind: "PrimitiveType", name: "char" };
       }
       if (targetType.kind === "ArrayType" || targetType.kind === "VectorType") {
         return targetType.elementType;
@@ -1357,7 +1357,7 @@ function getIterableElementType(
     return sourceType.elementType;
   }
   if (isStringType(sourceType)) {
-    return { kind: "PrimitiveType", name: "string" };
+    return { kind: "PrimitiveType", name: "char" };
   }
   pushError(context, line, col, "range-based for requires array, vector, or string");
   return null;

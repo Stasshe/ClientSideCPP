@@ -36,7 +36,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         return {
           kind: "pointer",
           pointeeType:
-            location.kind === "string" ? { kind: "PrimitiveType", name: "string" } : location.type,
+            location.kind === "string" ? { kind: "PrimitiveType", name: "char" } : location.type,
           target: location,
         };
       }
