@@ -322,6 +322,7 @@ export function DebugSidebar({
         <div className="mx-1 h-[18px] w-px bg-[var(--border2)]" />
         <button
           className="toolbar-button"
+          data-variant="step-into"
           title="Step Into"
           onClick={onStepInto}
           disabled={!canStep || isPending}
@@ -330,6 +331,7 @@ export function DebugSidebar({
         </button>
         <button
           className="toolbar-button"
+          data-variant="step-over"
           title="Step Over"
           onClick={onStepOver}
           disabled={!canStep || isPending}
@@ -338,6 +340,7 @@ export function DebugSidebar({
         </button>
         <button
           className="toolbar-button"
+          data-variant="step-out"
           title="Step Out"
           onClick={onStepOut}
           disabled={!canStep || isPending}

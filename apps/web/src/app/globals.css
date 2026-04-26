@@ -95,6 +95,33 @@
     background: rgba(244, 71, 71, 0.12);
   }
 
+  .toolbar-button[data-variant="step-into"] {
+    color: var(--yellow);
+  }
+
+  .toolbar-button[data-variant="step-into"]:hover:enabled {
+    background: rgba(220, 220, 170, 0.12);
+    color: var(--text-bright);
+  }
+
+  .toolbar-button[data-variant="step-over"] {
+    color: var(--accent2);
+  }
+
+  .toolbar-button[data-variant="step-over"]:hover:enabled {
+    background: rgba(86, 156, 214, 0.12);
+    color: var(--text-bright);
+  }
+
+  .toolbar-button[data-variant="step-out"] {
+    color: var(--orange);
+  }
+
+  .toolbar-button[data-variant="step-out"]:hover:enabled {
+    background: rgba(206, 145, 120, 0.12);
+    color: var(--text-bright);
+  }
+
   .status-dot {
     @apply h-2 w-2 shrink-0 rounded-full;
     background: var(--text-dim);
