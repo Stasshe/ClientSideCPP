@@ -1,6 +1,15 @@
+@font-face {
+  font-family: "JuliaMono";
+  src: url("https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.061/JuliaMono-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
 
 :root {
   color-scheme: dark;
@@ -48,6 +57,10 @@
 }
 
 @layer components {
+  .debug-vars-font {
+    font-family: "JuliaMono";
+  }
+
   .toolbar-button {
     @apply flex h-[30px] w-[30px] items-center justify-center rounded-[5px] border-0 bg-transparent transition-colors disabled:cursor-default disabled:opacity-[0.35];
     color: var(--text-dim);

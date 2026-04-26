@@ -92,7 +92,7 @@ function VariableValueTree({
   return (
     <div>
       <div
-        className={`flex items-center gap-1 py-px font-[var(--font-mono)] text-[10px] hover:bg-[var(--hl-line)] ${hasChildren ? "cursor-pointer" : ""}`}
+        className={`debug-vars-font flex items-center gap-1 py-px text-[10px] hover:bg-[var(--hl-line)] ${hasChildren ? "cursor-pointer" : ""}`}
         style={{ paddingLeft: rowPadding }}
         role={hasChildren ? "button" : undefined}
         tabIndex={hasChildren ? 0 : undefined}
@@ -166,7 +166,7 @@ function VariableRow({
   return (
     <div>
       <div
-        className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1 px-2 py-px pl-5 font-[var(--font-mono)] text-[11px] hover:bg-[var(--hl-line)] ${isExpandable ? "cursor-pointer" : ""}`}
+        className={`debug-vars-font grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1 px-2 py-px pl-5 text-[11px] hover:bg-[var(--hl-line)] ${isExpandable ? "cursor-pointer" : ""}`}
         role={isExpandable ? "button" : undefined}
         tabIndex={isExpandable ? 0 : undefined}
         onClick={isExpandable ? handleToggle : undefined}
