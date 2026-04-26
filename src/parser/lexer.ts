@@ -69,6 +69,7 @@ const ONE_CHAR_SYMBOLS = new Set<string>([
   ">",
   "=",
   "!",
+  "?",
   "~",
 ]);
 

@@ -193,6 +193,7 @@ export type CinStmtNode = NodeBase & {
 
 export type ExprNode =
   | AssignExprNode
+  | ConditionalExprNode
   | BinaryExprNode
   | UnaryExprNode
   | AddressOfExprNode
@@ -210,6 +211,14 @@ export type AssignExprNode = NodeBase & {
   operator: "=" | "+=" | "-=" | "*=" | "/=" | "%=";
   target: AssignTargetNode;
   value: ExprNode;
+};
+
+export type ConditionalExprNode = NodeBase & {
+  kind: "ConditionalExpr";
+  condition: ExprNode;
+  thenExpr: ExprNode;
+  elseExpr: ExprNode;
+  resolvedType: TypeNode | null;
 };
 
 export type BinaryExprNode = NodeBase & {

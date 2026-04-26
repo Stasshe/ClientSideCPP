@@ -1015,7 +1015,12 @@ export abstract class BaseParser {
   private isPairTypeStart(): boolean {
     const token = this.peek();
     const next = this.tokens[this.index + 1];
-    return token.kind === "identifier" && token.text === "pair" && next?.kind === "symbol" && next.text === "<";
+    return (
+      token.kind === "identifier" &&
+      token.text === "pair" &&
+      next?.kind === "symbol" &&
+      next.text === "<"
+    );
   }
 
   private parsePairType(): TypeNode | null {

@@ -215,4 +215,48 @@ signed main() {
     const result = compile(source);
     expect(result.ok).toBe(true);
   });
+
+  it("supports ternary operator with arithmetic precedence", () => {
+    const source = `
+int main() {
+  int a = 3;
+  int b = 7;
+  cout << (true ? a : b) << "\\n";
+  cout << (false ? a : b) << "\\n";
+  cout << (false ? 10 : 1 + 2 * 3) << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("3\n7\n7\n");
+  });
+
+  it("short-circuits ternary branches", () => {
+    const source = `
+int main() {
+  int x = 0;
+  cout << (true ? 1 : x / 0) << "\\n";
+  cout << (false ? x / 0 : 2) << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("1\n2\n");
+  });
+
+  it("coerces ternary result to pointer common type", () => {
+    const source = `
+int main() {
+  int a[2] = {10, 20};
+  int *p = true ? &a[0] : 0;
+  cout << *p << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("10\n");
+  });
 });

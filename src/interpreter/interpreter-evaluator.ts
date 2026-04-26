@@ -70,6 +70,16 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         return this.evaluateMethodCall(expr.receiver, expr.method, expr.args, expr.line);
       case "IndexExpr":
         return this.getIndexedValue(expr.target, expr.index, expr.line);
+      case "ConditionalExpr": {
+        const condition = this.evaluateExpr(expr.condition);
+        const selected = this.evaluateCondition(condition, expr.condition.line)
+          ? this.evaluateExpr(expr.thenExpr)
+          : this.evaluateExpr(expr.elseExpr);
+        if (expr.resolvedType === null) {
+          return selected;
+        }
+        return this.assertType(expr.resolvedType, selected, expr.line);
+      }
       case "UnaryExpr": {
         if (expr.operator === "!") {
           const value = this.expectBool(this.evaluateExpr(expr.operand), expr.line);
@@ -851,11 +861,11 @@ function compareValues(
         operator,
       );
     case "array":
-      fail("array comparison is not supported", line);
+      return fail("array comparison is not supported", line);
     case "pair":
-      fail("pair comparison is not supported", line);
+      return fail("pair comparison is not supported", line);
     case "reference":
-      fail("reference comparison is not supported", line);
+      return fail("reference comparison is not supported", line);
   }
 }
 
@@ -967,6 +977,8 @@ function sameReceiver(left: ExprNode, right: ExprNode): boolean {
     case "BinaryExpr":
       return false;
     case "AssignExpr":
+      return false;
+    case "ConditionalExpr":
       return false;
     case "AddressOfExpr":
       return false;

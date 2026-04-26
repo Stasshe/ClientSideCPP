@@ -454,6 +454,14 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
       }
       return targetType;
     }
+    case "ConditionalExpr": {
+      validateConditionExpr(expr.condition, context);
+      const thenType = validateExpr(expr.thenExpr, context);
+      const elseType = validateExpr(expr.elseExpr, context);
+      const resultType = resolveConditionalType(thenType, elseType, expr.line, expr.col, context);
+      expr.resolvedType = resultType;
+      return resultType;
+    }
     case "UnaryExpr": {
       const operandType = inferExprType(expr.operand, context);
       if (expr.operator === "!") {
@@ -953,6 +961,72 @@ function normalizeExpectedType(expected: TypeNode | "bool" | "int"): TypeNode {
     return { kind: "PrimitiveType", name: "int" };
   }
   return expected;
+}
+
+function resolveConditionalType(
+  thenType: TypeNode | null,
+  elseType: TypeNode | null,
+  line: number,
+  col: number,
+  context: ValidationContext,
+): TypeNode | null {
+  if (thenType === null || elseType === null) {
+    return null;
+  }
+
+  if (sameType(thenType, elseType)) {
+    return thenType;
+  }
+
+  if (thenType.kind === "PairType" && elseType.kind === "PairType") {
+    const firstType = resolveConditionalType(
+      thenType.firstType,
+      elseType.firstType,
+      line,
+      col,
+      context,
+    );
+    const secondType = resolveConditionalType(
+      thenType.secondType,
+      elseType.secondType,
+      line,
+      col,
+      context,
+    );
+    if (firstType === null || secondType === null) {
+      return null;
+    }
+    return { kind: "PairType", firstType, secondType };
+  }
+
+  if (isPointerType(thenType) && isNullPointerType(elseType)) {
+    return thenType;
+  }
+  if (isPointerType(elseType) && isNullPointerType(thenType)) {
+    return elseType;
+  }
+
+  if (isNumericType(thenType) && isNumericType(elseType)) {
+    if (isDoubleType(thenType) || isDoubleType(elseType)) {
+      return { kind: "PrimitiveType", name: "double" };
+    }
+    return { kind: "PrimitiveType", name: "int" };
+  }
+
+  if (isAssignable(thenType, elseType) && !isAssignable(elseType, thenType)) {
+    return elseType;
+  }
+  if (isAssignable(elseType, thenType) && !isAssignable(thenType, elseType)) {
+    return thenType;
+  }
+
+  pushError(
+    context,
+    line,
+    col,
+    `incompatible operand types for ?: '${typeToString(thenType)}' and '${typeToString(elseType)}'`,
+  );
+  return null;
 }
 
 function sameType(left: TypeNode, right: TypeNode): boolean {

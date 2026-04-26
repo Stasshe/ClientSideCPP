@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compileAndRun } from "./test-helper";
+import { compile, compileAndRun } from "./test-helper";
 
 describe("Semantics And Builtins", () => {
   it("too many arguments to function is compile error", () => {
@@ -260,5 +260,20 @@ int main() {
     const result = compileAndRun(source);
     expect(result.status).toBe("done");
     expect(result.output.stdout).toBe("9\n");
+  });
+
+  it("rejects incompatible ternary branch types", () => {
+    const source = `
+int main() {
+  int x = true ? 1 : "s";
+  return 0;
+}
+`;
+    const result = compile(source);
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("expected compile error");
+    }
+    expect(result.errors[0]?.message).toMatch(/incompatible operand types for \?:/);
   });
 });

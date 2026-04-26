@@ -2,6 +2,7 @@ import type {
   AddressOfExprNode,
   AssignExprNode,
   BinaryExprNode,
+  ConditionalExprNode,
   DerefExprNode,
   ExprNode,
   UnaryExprNode,
@@ -64,7 +65,7 @@ export abstract class ExpressionParser extends BaseParser {
   }
 
   private parseAssignment(): ExprNode {
-    const left = this.parseLogicalOr();
+    const left = this.parseConditional();
     if (this.matchAnySymbol(["=", "+=", "-=", "*=", "/=", "%="])) {
       const opToken = this.previous();
       if (!isAssignTarget(left)) {
@@ -82,6 +83,28 @@ export abstract class ExpressionParser extends BaseParser {
       return node;
     }
     return left;
+  }
+
+  private parseConditional(): ExprNode {
+    const condition = this.parseLogicalOr();
+    if (!this.matchSymbol("?")) {
+      return condition;
+    }
+
+    const thenExpr = this.parseAssignment();
+    if (!this.consumeSymbol(":", "expected ':' in conditional expression")) {
+      return condition;
+    }
+    const elseExpr = this.parseConditional();
+    const node: ConditionalExprNode = {
+      kind: "ConditionalExpr",
+      condition,
+      thenExpr,
+      elseExpr,
+      resolvedType: null,
+      ...this.rangeFromNode(condition, elseExpr),
+    };
+    return node;
   }
 
   private parseLogicalOr(): ExprNode {
