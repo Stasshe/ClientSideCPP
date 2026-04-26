@@ -215,7 +215,7 @@ function VariableRow({
         </span>
       </div>
       {arrayView && isExpanded ? (
-        <div className="ml-5 max-h-[375px] overflow-y-auto border-l border-[var(--border)] pb-1.5 [scrollbar-color:var(--border2)_transparent] [scrollbar-width:thin]">
+        <div className="ml-5 max-h-[200px] overflow-y-auto border-l border-[var(--border)] pb-1.5 [scrollbar-color:var(--border2)_transparent] [scrollbar-width:thin]">
           {arrayView.values.map((value, index) => (
             <VariableValueTree
               key={index}
