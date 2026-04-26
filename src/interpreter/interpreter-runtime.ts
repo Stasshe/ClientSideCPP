@@ -314,6 +314,14 @@ export abstract class InterpreterRuntime {
     if (type.kind === "VectorType") {
       return this.allocateArray(type, []);
     }
+    if (type.kind === "PairType") {
+      return {
+        kind: "pair",
+        type,
+        first: this.defaultValueForType(type.firstType, line),
+        second: this.defaultValueForType(type.secondType, line),
+      };
+    }
     this.fail("fixed array value requires dimensions", line);
   }
 
@@ -444,6 +452,9 @@ export abstract class InterpreterRuntime {
       this.writeLocation(current.target, value, line);
       return current;
     }
+    if (current.kind === "pair") {
+      return this.assertType(current.type, value, line);
+    }
     if (current.kind === "void") {
       this.fail("cannot assign to void", line);
     }
@@ -495,6 +506,21 @@ export abstract class InterpreterRuntime {
         return { kind: "uninitialized", expectedType: type };
       }
       this.fail(`cannot convert '${value.kind}' to '${this.typeKindName(type)}'`, line);
+    }
+
+    if (type.kind === "PairType") {
+      if (value.kind === "uninitialized") {
+        return { kind: "uninitialized", expectedType: type };
+      }
+      if (value.kind !== "pair") {
+        this.fail(`cannot convert '${value.kind}' to '${this.typeKindName(type)}'`, line);
+      }
+      return {
+        kind: "pair",
+        type,
+        first: this.assertType(type.firstType, value.first, line),
+        second: this.assertType(type.secondType, value.second, line),
+      };
     }
 
     if (value.kind !== "array") {
@@ -600,6 +626,8 @@ export abstract class InterpreterRuntime {
         return "array";
       case "VectorType":
         return "vector";
+      case "PairType":
+        return "pair";
       case "PointerType":
         return "pointer";
       case "ReferenceType":
@@ -638,6 +666,8 @@ export abstract class InterpreterRuntime {
         return this.serializeValue(this.readLocation(value.target, this.currentLine));
       case "uninitialized":
         return `<uninitialized:${typeToString(value.expectedType)}>`;
+      case "pair":
+        return `(${this.serializeValue(value.first)}, ${this.serializeValue(value.second)})`;
       default:
         return stringifyValue(value);
     }
@@ -739,16 +769,23 @@ export abstract class InterpreterRuntime {
       case "PrimitiveType":
         return right.kind === "PrimitiveType" && left.name === right.name;
       case "ArrayType":
-      case "VectorType":
-        if (right.kind === "PrimitiveType") {
+        if (right.kind !== "ArrayType") {
           return false;
         }
-        if (right.kind === "PointerType" || right.kind === "ReferenceType") {
+        return this.sameType(left.elementType, right.elementType);
+      case "VectorType":
+        if (right.kind !== "VectorType") {
           return false;
         }
         return this.sameType(left.elementType, right.elementType);
       case "PointerType":
         return right.kind === "PointerType" && this.sameType(left.pointeeType, right.pointeeType);
+      case "PairType":
+        return (
+          right.kind === "PairType" &&
+          this.sameType(left.firstType, right.firstType) &&
+          this.sameType(left.secondType, right.secondType)
+        );
       case "ReferenceType":
         return (
           right.kind === "ReferenceType" && this.sameType(left.referredType, right.referredType)
@@ -862,6 +899,8 @@ export abstract class InterpreterRuntime {
         return { kind: "PrimitiveType", name: "bool" };
       case "string":
         return { kind: "PrimitiveType", name: "string" };
+      case "pair":
+        return value.type;
       case "array":
         return value.type;
       case "pointer":

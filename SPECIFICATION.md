@@ -19,7 +19,7 @@
 |---|---|
 | 動的メモリ（`malloc`, `new`, `free`, `delete`） | |
 | 構造体・クラス（`struct`, `class`） | |
-| テンプレート（`template<>`） | |
+| テンプレート（`template<>`） | `vector<T>` と `pair<T,U>` の型構文のみ特別対応 |
 | 関数ポインタ | |
 | 名前空間（`namespace`） | `using namespace std;` のみ特別扱いで許可 |
 | プリプロセッサ | `#include <bits/stdc++.h>` と `#define` のみ対応 |
@@ -131,6 +131,18 @@ for (auto& x : v) { ... }
 - 現在は range-based for の束縛変数でのみ `auto` をサポートする
 - `auto` は要素の値コピー、`auto&` は各要素への参照束縛になる
 - 一般の変数宣言（`auto x = ...;`）や関数戻り値推論は非対応
+
+### 3.6 `pair`
+
+```cpp
+pair<int, int> p = make_pair(1, 2);
+cout << p.first << " " << p.second << "\n";
+```
+
+- `pair<T, U>` を型としてサポートする
+- 生成は `make_pair(a, b)` をサポートする
+- メンバーアクセスとして `p.first` と `p.second` をサポートする
+- 構造化束縛（`auto [x, y]`）は非対応
 
 ---
 

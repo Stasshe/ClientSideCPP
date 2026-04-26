@@ -258,6 +258,35 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
       return { kind: "void" };
     }
 
+    if (callee === "make_pair") {
+      if (args.length !== 2) {
+        this.fail("make_pair requires exactly 2 arguments", line);
+      }
+      const firstExpr = args[0];
+      const secondExpr = args[1];
+      if (firstExpr === undefined || secondExpr === undefined) {
+        this.fail("make_pair requires exactly 2 arguments", line);
+      }
+      const firstValue = this.ensureNotVoid(
+        this.ensureInitialized(this.evaluateExpr(firstExpr), line, "value"),
+        line,
+      );
+      const secondValue = this.ensureNotVoid(
+        this.ensureInitialized(this.evaluateExpr(secondExpr), line, "value"),
+        line,
+      );
+      return {
+        kind: "pair",
+        type: {
+          kind: "PairType",
+          firstType: this.runtimeValueToType(firstValue, line),
+          secondType: this.runtimeValueToType(secondValue, line),
+        },
+        first: firstValue,
+        second: secondValue,
+      };
+    }
+
     if (callee === "sort") {
       this.applyRangeBuiltin("sort", args, line);
       return { kind: "void" };
@@ -304,6 +333,15 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
     line: number,
   ): RuntimeValue {
     const receiver = this.evaluateExpr(receiverExpr);
+    if (receiver.kind === "pair") {
+      if (method !== "first" && method !== "second") {
+        this.fail(`unknown pair member '${method}'`, line);
+      }
+      if (args.length !== 0) {
+        this.fail(`${method} requires no arguments`, line);
+      }
+      return method === "first" ? receiver.first : receiver.second;
+    }
     const arrayValue = this.expectArray(receiver, line);
     const store = this.arrays.get(arrayValue.ref);
     if (store === undefined) {
@@ -814,6 +852,8 @@ function compareValues(
       );
     case "array":
       fail("array comparison is not supported", line);
+    case "pair":
+      fail("pair comparison is not supported", line);
     case "reference":
       fail("reference comparison is not supported", line);
   }

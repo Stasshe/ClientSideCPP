@@ -529,4 +529,64 @@ int main() {
     expect(result.status).toBe("done");
     expect(result.output.stdout).toBe("equal\nnot equal\n");
   });
+
+  it("supports top-k frequency-sum reduction with vector-only implementation", () => {
+    const source = `
+#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+  ios::sync_with_stdio(false);
+  cin.tie(nullptr);
+
+  int n, k;
+  cin >> n >> k;
+
+  vector<long long> arr(n);
+  for (auto& x : arr) cin >> x;
+
+  long long total = 0;
+  for (int i = 0; i < n; i++) {
+    total += arr[i];
+  }
+
+  if (n == 0) {
+    cout << 0 << "\\n";
+    return 0;
+  }
+
+  sort(arr.begin(), arr.end());
+
+  vector<long long> groupSums;
+  long long currentValue = arr[0];
+  long long currentSum = arr[0];
+  for (int i = 1; i < n; i++) {
+    if (arr[i] == currentValue) {
+      currentSum += arr[i];
+    } else {
+      groupSums.push_back(currentSum);
+      currentValue = arr[i];
+      currentSum = arr[i];
+    }
+  }
+  groupSums.push_back(currentSum);
+
+  sort(groupSums.begin(), groupSums.end(), greater<int>());
+
+  int take = k;
+  if (take > groupSums.size()) {
+    take = groupSums.size();
+  }
+  for (int i = 0; i < take; i++) {
+    total -= groupSums[i];
+  }
+
+  cout << total << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source, "8 2\n1 1 2 2 2 3 4 4\n");
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("5\n");
+  });
 });

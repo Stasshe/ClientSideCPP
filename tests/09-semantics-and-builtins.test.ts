@@ -206,4 +206,59 @@ int main() {
     expect(result.status).toBe("error");
     expect(result.error?.message).toMatch(/unsupported preprocessor directive/);
   });
+
+  it("rejects unordered_map with a clear unsupported-feature error", () => {
+    const source = `
+int main() {
+  unordered_map<long long, long long> freq;
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("error");
+    expect(result.error?.message).toMatch(/this feature is not supported in this interpreter/);
+  });
+
+  it("rejects structured bindings in range-for with unsupported-feature error", () => {
+    const source = `
+int main() {
+  vector<int> a(3, 1);
+  for (auto& [x, y] : a) {
+    x = y;
+  }
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("error");
+    expect(result.error?.message).toMatch(/this feature is not supported in this interpreter/);
+  });
+
+  it("supports pair declaration with make_pair and member access", () => {
+    const source = `
+int main() {
+  pair<long long, long long> p = make_pair(10, 20);
+  cout << p.first << " " << p.second << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("10 20\n");
+  });
+
+  it("supports vector of pairs", () => {
+    const source = `
+int main() {
+  vector<pair<int, int>> edges;
+  edges.push_back(make_pair(2, 5));
+  edges.push_back(make_pair(3, 7));
+  cout << edges[0].first + edges[1].second << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("9\n");
+  });
 });

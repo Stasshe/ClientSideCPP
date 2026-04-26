@@ -15,6 +15,12 @@ export type VectorTypeNode = {
   elementType: TypeNode;
 };
 
+export type PairTypeNode = {
+  kind: "PairType";
+  firstType: TypeNode;
+  secondType: TypeNode;
+};
+
 export type PointerTypeNode = {
   kind: "PointerType";
   pointeeType: TypeNode;
@@ -29,6 +35,7 @@ export type TypeNode =
   | PrimitiveTypeNode
   | ArrayTypeNode
   | VectorTypeNode
+  | PairTypeNode
   | PointerTypeNode
   | ReferenceTypeNode;
 
@@ -310,6 +317,7 @@ export type DebugValueView = {
     | "double"
     | "bool"
     | "string"
+    | "pair"
     | "array"
     | "pointer"
     | "reference"
@@ -402,6 +410,10 @@ export function vectorType(elementType: TypeNode): VectorTypeNode {
   return { kind: "VectorType", elementType };
 }
 
+export function pairType(firstType: TypeNode, secondType: TypeNode): PairTypeNode {
+  return { kind: "PairType", firstType, secondType };
+}
+
 export function pointerType(pointeeType: TypeNode): PointerTypeNode {
   return { kind: "PointerType", pointeeType };
 }
@@ -422,6 +434,10 @@ export function isVectorType(type: TypeNode): type is VectorTypeNode {
   return type.kind === "VectorType";
 }
 
+export function isPairType(type: TypeNode): type is PairTypeNode {
+  return type.kind === "PairType";
+}
+
 export function isPointerType(type: TypeNode): type is PointerTypeNode {
   return type.kind === "PointerType";
 }
@@ -438,6 +454,8 @@ export function typeToString(type: TypeNode): string {
       return `${typeToString(type.elementType)}[]`;
     case "VectorType":
       return `vector<${typeToString(type.elementType)}>`;
+    case "PairType":
+      return `pair<${typeToString(type.firstType)}, ${typeToString(type.secondType)}>`;
     case "PointerType":
       return `${typeToString(type.pointeeType)}*`;
     case "ReferenceType":

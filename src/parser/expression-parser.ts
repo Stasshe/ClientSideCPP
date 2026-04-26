@@ -230,18 +230,17 @@ export abstract class ExpressionParser extends BaseParser {
         if (methodToken === null) {
           break;
         }
-        if (!this.consumeSymbol("(", "expected '(' after method name")) {
-          break;
-        }
         const args: ExprNode[] = [];
-        if (!this.matchSymbol(")")) {
-          while (true) {
-            args.push(this.parseExpression());
-            if (this.matchSymbol(")")) {
-              break;
-            }
-            if (!this.consumeSymbol(",", "expected ',' or ')' in argument list")) {
-              break;
+        if (this.matchSymbol("(")) {
+          if (!this.matchSymbol(")")) {
+            while (true) {
+              args.push(this.parseExpression());
+              if (this.matchSymbol(")")) {
+                break;
+              }
+              if (!this.consumeSymbol(",", "expected ',' or ')' in argument list")) {
+                break;
+              }
             }
           }
         }

@@ -19,6 +19,7 @@ import type {
 import {
   arrayType,
   isPrimitiveType,
+  pairType,
   pointerType,
   primitiveType,
   referenceType,
@@ -26,6 +27,13 @@ import {
 } from "../types";
 
 const TYPE_KEYWORDS = new Set<string>(["int", "long", "double", "bool", "string", "void"]);
+const UNSUPPORTED_TEMPLATE_TYPES = new Set<string>([
+  "unordered_map",
+  "priority_queue",
+  "map",
+  "set",
+  "unordered_set",
+]);
 
 export abstract class BaseParser {
   protected readonly tokens: Token[];
@@ -337,6 +345,11 @@ export abstract class BaseParser {
       return { kind: "CinStmt", targets, ...this.rangeToPrevious(token) };
     }
 
+    if (this.isUnsupportedTemplateTypeDeclarationStart()) {
+      this.errorAtCurrent("this feature is not supported in this interpreter");
+      return null;
+    }
+
     const expression = this.parseExpression();
     if (!this.consumeSymbol(";", "expected ';' after expression")) {
       return null;
@@ -562,6 +575,9 @@ export abstract class BaseParser {
     if (this.checkKeyword("vector")) {
       return this.parseVectorType();
     }
+    if (this.isPairTypeStart()) {
+      return this.parsePairType();
+    }
     return this.parsePrimitiveType();
   }
 
@@ -623,7 +639,7 @@ export abstract class BaseParser {
   }
 
   protected checkTypeStart(): boolean {
-    return this.peekPrimitiveTypeKeyword() || this.checkKeyword("vector");
+    return this.peekPrimitiveTypeKeyword() || this.checkKeyword("vector") || this.isPairTypeStart();
   }
 
   protected consume(kind: Token["kind"], message: string): Token | null {
@@ -827,6 +843,9 @@ export abstract class BaseParser {
     if (type.kind === "ReferenceType") {
       return this.isVoidTypeNode(type.referredType);
     }
+    if (type.kind === "PairType") {
+      return this.isVoidTypeNode(type.firstType) || this.isVoidTypeNode(type.secondType);
+    }
     return this.isVoidTypeNode(type.elementType);
   }
 
@@ -954,6 +973,10 @@ export abstract class BaseParser {
   } | null {
     if (this.matchKeyword("auto")) {
       const byReference = this.matchSymbol("&");
+      if (this.checkSymbol("[")) {
+        this.errorAtCurrent("this feature is not supported in this interpreter");
+        return null;
+      }
       const nameToken = this.consumeIdentifier("expected loop variable name");
       if (nameToken === null) {
         return null;
@@ -978,6 +1001,51 @@ export abstract class BaseParser {
         declarator.type.kind === "ReferenceType" ? declarator.type.referredType : declarator.type,
       byReference: declarator.type.kind === "ReferenceType",
     };
+  }
+
+  private isUnsupportedTemplateTypeDeclarationStart(): boolean {
+    const token = this.peek();
+    if (token.kind !== "identifier" || !UNSUPPORTED_TEMPLATE_TYPES.has(token.text)) {
+      return false;
+    }
+    const next = this.tokens[this.index + 1];
+    return next?.kind === "symbol" && next.text === "<";
+  }
+
+  private isPairTypeStart(): boolean {
+    const token = this.peek();
+    const next = this.tokens[this.index + 1];
+    return token.kind === "identifier" && token.text === "pair" && next?.kind === "symbol" && next.text === "<";
+  }
+
+  private parsePairType(): TypeNode | null {
+    if (!(this.peek().kind === "identifier" && this.peek().text === "pair")) {
+      this.errorAtCurrent("expected 'pair'");
+      return null;
+    }
+    this.advance();
+    if (!this.consumeSymbol("<", "expected '<' after pair")) {
+      return null;
+    }
+    const firstType = this.parseType();
+    if (firstType === null) {
+      return null;
+    }
+    if (!this.consumeSymbol(",", "expected ',' in pair type")) {
+      return null;
+    }
+    const secondType = this.parseType();
+    if (secondType === null) {
+      return null;
+    }
+    if (this.isVoidTypeNode(firstType) || this.isVoidTypeNode(secondType)) {
+      this.errorAtCurrent("pair element type cannot be void");
+      return null;
+    }
+    if (!this.consumeTypeClose("expected '>' after pair type")) {
+      return null;
+    }
+    return pairType(firstType, secondType);
   }
 }
 

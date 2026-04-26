@@ -711,6 +711,18 @@ function validateBuiltinCall(
     return { kind: "PrimitiveType", name: "void" };
   }
 
+  if (callee === "make_pair") {
+    if (args.length !== 2) {
+      pushError(context, line, col, "make_pair requires exactly 2 arguments");
+    }
+    const firstType = validateExpr(args[0] ?? null, context);
+    const secondType = validateExpr(args[1] ?? null, context);
+    if (firstType === null || secondType === null) {
+      return null;
+    }
+    return { kind: "PairType", firstType, secondType };
+  }
+
   if (callee === "sort" || callee === "reverse" || callee === "fill") {
     return validateRangeBuiltin(callee, args, line, col, context);
   }
@@ -816,7 +828,20 @@ function validateMethodCall(
     return null;
   }
   if (receiverType.kind !== "VectorType") {
-    pushError(context, line, col, "type mismatch: expected array/vector");
+    if (receiverType.kind === "PairType") {
+      if (method !== "first" && method !== "second") {
+        pushError(context, line, col, `unknown pair member '${method}'`);
+        for (const arg of args) {
+          validateExpr(arg, context);
+        }
+        return null;
+      }
+      if (args.length !== 0) {
+        pushError(context, line, col, `${method} requires no arguments`);
+      }
+      return method === "first" ? receiverType.firstType : receiverType.secondType;
+    }
+    pushError(context, line, col, "type mismatch: expected array/vector/pair");
     for (const arg of args) {
       validateExpr(arg, context);
     }
@@ -947,6 +972,11 @@ function sameType(left: TypeNode, right: TypeNode): boolean {
         left.elementType,
         (right as Extract<TypeNode, { kind: "VectorType" }>).elementType,
       );
+    case "PairType":
+      return (
+        sameType(left.firstType, (right as Extract<TypeNode, { kind: "PairType" }>).firstType) &&
+        sameType(left.secondType, (right as Extract<TypeNode, { kind: "PairType" }>).secondType)
+      );
     case "PointerType":
       return sameType(
         left.pointeeType,
@@ -963,6 +993,12 @@ function sameType(left: TypeNode, right: TypeNode): boolean {
 function isAssignable(source: TypeNode, target: TypeNode): boolean {
   if (sameType(source, target)) {
     return true;
+  }
+  if (source.kind === "PairType" && target.kind === "PairType") {
+    return (
+      isAssignable(source.firstType, target.firstType) &&
+      isAssignable(source.secondType, target.secondType)
+    );
   }
   return (
     isPrimitiveType(source) &&
@@ -1020,6 +1056,9 @@ function containsVoid(type: TypeNode): boolean {
   if (type.kind === "ReferenceType") {
     return containsVoid(type.referredType);
   }
+  if (type.kind === "PairType") {
+    return containsVoid(type.firstType) || containsVoid(type.secondType);
+  }
   return containsVoid(type.elementType);
 }
 
@@ -1050,6 +1089,9 @@ function containsReferenceNested(type: TypeNode): boolean {
   }
   if (type.kind === "PointerType") {
     return containsReferenceNested(type.pointeeType);
+  }
+  if (type.kind === "PairType") {
+    return containsReferenceNested(type.firstType) || containsReferenceNested(type.secondType);
   }
   if (type.kind === "ArrayType" || type.kind === "VectorType") {
     return containsReferenceNested(type.elementType);
