@@ -38,14 +38,20 @@
 | `long long` | JS `BigInt` | `int` と同一として扱う |
 | `double` | JS `number` | 浮動小数点 |
 | `bool` | JS `boolean` | `true` / `false` リテラル |
+| `char` | JS `string` | 長さ 1 の Unicode 文字 |
 | `string` | JS `string` | cin/cout での入出力に使用 |
 
 - `int` と `long long` は同一の内部型として扱う。オーバーフロー検査や 64bit 範囲制約は行わない
+- `char` は長さ 1 の文字として保持するが、数値演算・比較では整数型としても扱える
 - `int` / `long long` と `double` の間では数値演算・代入・引数受け渡し・三項演算子の共通型解決で暗黙変換を許可する
+- `char` と `int` / `long long` / `double` の間では数値演算・代入・引数受け渡し・三項演算子の共通型解決で暗黙変換を許可する
+- `char` と `string` の間では、`string` 側が長さ 1 のときのみ代入・引数受け渡しが実行時に成功する。長さ 1 以外は実行時エラー
 - `double` から `int` / `long long` への変換は、値が有限かつ整数値のときのみ実行時に成功する。非整数や `NaN` / `Infinity` は実行時エラー
+- `double` から `char` への変換は、値が有限かつ整数値で、有効な Unicode code point の範囲内にあるときのみ実行時に成功する
 - `bool` と数値型の間の一般的な暗黙変換は行わない。ただし `if` / `while` / `for` / 三項演算子の条件式では `bool`、`int`、`long long`、`double` を受理する
 - `string` に対して使える演算は `+`（連結）、`==`、`!=`、`<`、`<=`、`>`、`>=`（辞書順比較）のみ
 - `string` は `s[i]` で長さ 1 の `string` として読み書きできる
+- `char` リテラルは `'a'`、`'\n'`、`'\\'` のように表記する。複数文字を含む文字リテラルはコンパイルエラー
 
 ### 3.2 ポインタ型と参照型
 

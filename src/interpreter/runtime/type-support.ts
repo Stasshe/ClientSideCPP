@@ -21,6 +21,9 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
       if (type.name === "bool") {
         return { kind: "bool", value: false };
       }
+      if (type.name === "char") {
+        return { kind: "char", value: "\0" };
+      }
       if (type.name === "string") {
         return { kind: "string", value: "" };
       }
@@ -219,7 +222,7 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
   }
 
   protected coerceRuntimeValue(
-    expected: "int" | "double" | "bool" | "string",
+    expected: "int" | "double" | "bool" | "char" | "string",
     value: RuntimeValue,
     line: number,
   ): RuntimeValue {
@@ -233,11 +236,35 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
     if (expected === "double" && initialized.kind === "int") {
       return { kind: "double", value: Number(initialized.value) };
     }
+    if (expected === "double" && initialized.kind === "char") {
+      return { kind: "double", value: Number(initialized.value.codePointAt(0) ?? 0) };
+    }
     if (expected === "int" && initialized.kind === "double") {
       if (!Number.isFinite(initialized.value) || !Number.isInteger(initialized.value)) {
         this.fail("cannot convert 'double' to 'int'", line);
       }
       return { kind: "int", value: BigInt(initialized.value) };
+    }
+    if (expected === "int" && initialized.kind === "char") {
+      return { kind: "int", value: BigInt(initialized.value.codePointAt(0) ?? 0) };
+    }
+    if (expected === "char" && initialized.kind === "int") {
+      return this.intToChar(initialized.value, line);
+    }
+    if (expected === "char" && initialized.kind === "double") {
+      if (!Number.isFinite(initialized.value) || !Number.isInteger(initialized.value)) {
+        this.fail("cannot convert 'double' to 'char'", line);
+      }
+      return this.intToChar(BigInt(initialized.value), line);
+    }
+    if (expected === "char" && initialized.kind === "string") {
+      if (Array.from(initialized.value).length !== 1) {
+        this.fail("cannot convert 'string' to 'char'", line);
+      }
+      return { kind: "char", value: initialized.value };
+    }
+    if (expected === "string" && initialized.kind === "char") {
+      return { kind: "string", value: initialized.value };
     }
     this.fail(`cannot convert '${initialized.kind}' to '${expected}'`, line);
   }

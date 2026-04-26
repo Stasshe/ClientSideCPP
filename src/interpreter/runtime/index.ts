@@ -1,6 +1,6 @@
+import { toRuntimeErrorInfo } from "@/diagnostics";
 import type { RuntimeTrap } from "@/runtime/errors";
 import type { RuntimeValue } from "@/runtime/value";
-import { toRuntimeErrorInfo } from "@/diagnostics";
 import type {
   DebugExecutionRange,
   DebugInfo,

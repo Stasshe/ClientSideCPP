@@ -54,8 +54,9 @@ export abstract class BaseParser extends BaseParserSupport {
         return null;
       }
 
-      const branches: Array<{ condition: ExprNode; thenBlock: import("@/types").BlockStmtNode }> =
-        [{ condition, thenBlock }];
+      const branches: Array<{ condition: ExprNode; thenBlock: import("@/types").BlockStmtNode }> = [
+        { condition, thenBlock },
+      ];
       let elseBlock: import("@/types").BlockStmtNode | null = null;
 
       while (this.checkKeyword("else") && this.checkNextKeyword("if")) {

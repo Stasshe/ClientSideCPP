@@ -17,6 +17,7 @@ export type RuntimeValue =
   | { kind: "int"; value: bigint }
   | { kind: "double"; value: number }
   | { kind: "bool"; value: boolean }
+  | { kind: "char"; value: string }
   | { kind: "string"; value: string }
   | { kind: "pair"; type: PairTypeNode; first: RuntimeValue; second: RuntimeValue }
   | { kind: "tuple"; type: TupleTypeNode; values: RuntimeValue[] }
@@ -35,6 +36,8 @@ export function defaultValueForType(type: PrimitiveTypeNode): RuntimeValue {
       return { kind: "bool", value: false };
     case "double":
       return { kind: "double", value: 0 };
+    case "char":
+      return { kind: "char", value: "\0" };
     case "string":
       return { kind: "string", value: "" };
     case "void":
@@ -56,6 +59,8 @@ export function stringifyValue(value: RuntimeValue): string {
       return Number.isInteger(value.value)
         ? value.value.toFixed(1).replace(/\.0$/, "")
         : value.value.toString();
+    case "char":
+      return value.value;
     case "string":
       return value.value;
     case "pair":

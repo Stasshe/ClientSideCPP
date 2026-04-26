@@ -11,7 +11,7 @@ import {
 } from "@/types";
 import { BaseParserCore } from "./core";
 
-const TYPE_KEYWORDS = new Set<string>(["int", "long", "double", "bool", "string", "void"]);
+const TYPE_KEYWORDS = new Set<string>(["int", "long", "double", "bool", "char", "string", "void"]);
 
 export abstract class BaseParserTypeSupport extends BaseParserCore {
   protected parseType(): TypeNode | null {
@@ -58,6 +58,9 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
     }
     if (this.matchKeyword("bool")) {
       return primitiveType("bool");
+    }
+    if (this.matchKeyword("char")) {
+      return primitiveType("char");
     }
     if (this.matchKeyword("double")) {
       return primitiveType("double");

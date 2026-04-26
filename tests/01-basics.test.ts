@@ -259,4 +259,64 @@ int main() {
     expect(result.status).toBe("done");
     expect(result.output.stdout).toBe("10\n");
   });
+
+  it("string and chars in ternary operator", () => {
+    const source = `
+int main() {
+  char c = true ? 'a' : 'b';
+  string s = false ? "x" : "y";
+  cout << c << " " << s << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("a y\n");
+  });
+
+  it("supports char literals arithmetic and cin", () => {
+    const source = `
+int main() {
+  char c = '7';
+  char input;
+  cin >> input;
+  cout << c << "\\n";
+  cout << (c - '0') << "\\n";
+  cout << input << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source, "z");
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("7\n7\nz\n");
+  });
+
+  it("allows char and single-character string conversions", () => {
+    const source = `
+int main() {
+  char c = "A";
+  string s = c;
+  cout << s << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("A\n");
+  });
+
+  it("rejects multi-character char literal", () => {
+    const source = `
+int main() {
+  char c = 'ab';
+  return 0;
+}
+`;
+    const result = compile(source);
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors[0]?.message).toBe("character literal must contain exactly one character");
+  });
 });

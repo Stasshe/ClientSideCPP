@@ -4,6 +4,7 @@ const KEYWORDS = new Set<string>([
   "int",
   "long",
   "bool",
+  "char",
   "string",
   "void",
   "double",
@@ -222,6 +223,57 @@ export function lex(source: string): LexResult {
         });
       } else {
         addToken("string", value, tokenLine, tokenCol, line, col);
+      }
+      continue;
+    }
+
+    if (ch === "'") {
+      const tokenLine = line;
+      const tokenCol = col;
+      advance();
+      let value = "";
+      let closed = false;
+      while (index < source.length) {
+        const c = advance();
+        if (c === "'") {
+          closed = true;
+          break;
+        }
+        if (c === "\\") {
+          const esc = advance();
+          if (esc === "n") {
+            value += "\n";
+          } else if (esc === "t") {
+            value += "\t";
+          } else if (esc === "'") {
+            value += "'";
+          } else if (esc === '"') {
+            value += '"';
+          } else if (esc === "\\") {
+            value += "\\";
+          } else if (esc === "0") {
+            value += "\0";
+          } else {
+            value += esc;
+          }
+        } else {
+          value += c;
+        }
+      }
+      if (!closed) {
+        errors.push({
+          line: tokenLine,
+          col: tokenCol,
+          message: "unterminated character literal",
+        });
+      } else if (Array.from(value).length !== 1) {
+        errors.push({
+          line: tokenLine,
+          col: tokenCol,
+          message: "character literal must contain exactly one character",
+        });
+      } else {
+        addToken("char", value, tokenLine, tokenCol, line, col);
       }
       continue;
     }

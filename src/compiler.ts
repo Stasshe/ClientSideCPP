@@ -5,11 +5,11 @@ import {
   formatRuntimeError,
 } from "@/diagnostics";
 import { runProgram } from "@/interpreter";
-import { lex } from "@/parser/lexer";
 import { parse } from "@/parser";
+import { lex } from "@/parser/lexer";
 import { preprocess } from "@/preprocessor";
 import { validateProgram } from "@/semantic/validator";
-import type { CompileError, CompileResult, ProgramNode, RunResult } from "@/types";
+import type { CompileResult, ProgramNode, RunResult } from "@/types";
 
 export function compile(source: string): CompileResult {
   const preprocessed = preprocess(source);

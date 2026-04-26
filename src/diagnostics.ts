@@ -1,5 +1,5 @@
-import type { CompileError, RuntimeErrorInfo, RuntimeStackFrame } from "@/types";
 import type { RuntimeTrap } from "@/runtime/errors";
+import type { CompileError, RuntimeErrorInfo, RuntimeStackFrame } from "@/types";
 
 export const DEFAULT_SOURCE_FILENAME = "main.cpp";
 

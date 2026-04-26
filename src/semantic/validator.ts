@@ -389,6 +389,9 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
       if (expr.valueType === "bool") {
         return { kind: "PrimitiveType", name: "bool" };
       }
+      if (expr.valueType === "char") {
+        return { kind: "PrimitiveType", name: "char" };
+      }
       return { kind: "PrimitiveType", name: "string" };
     case "Identifier":
       if (expr.name === "endl") {
@@ -1172,10 +1175,14 @@ function isAssignable(source: TypeNode, target: TypeNode): boolean {
   return (
     isPrimitiveType(source) &&
     isPrimitiveType(target) &&
-    ((source.name === "int" && target.name === "long long") ||
-      (source.name === "long long" && target.name === "int") ||
-      ((source.name === "int" || source.name === "long long") && target.name === "double") ||
-      (source.name === "double" && (target.name === "int" || target.name === "long long")))
+    ((source.name === "char" && target.name === "string") ||
+      (source.name === "string" && target.name === "char") ||
+      ((source.name === "int" || source.name === "long long" || source.name === "char") &&
+        (target.name === "int" || target.name === "long long" || target.name === "char")) ||
+      ((source.name === "int" || source.name === "long long" || source.name === "char") &&
+        target.name === "double") ||
+      (source.name === "double" &&
+        (target.name === "int" || target.name === "long long" || target.name === "char")))
   );
 }
 
@@ -1189,7 +1196,10 @@ function isAssignableExpr(expr: ExprNode): boolean {
 }
 
 function isIntType(type: TypeNode): boolean {
-  return isPrimitiveType(type) && (type.name === "int" || type.name === "long long");
+  return (
+    isPrimitiveType(type) &&
+    (type.name === "int" || type.name === "long long" || type.name === "char")
+  );
 }
 
 function isDoubleType(type: TypeNode): boolean {

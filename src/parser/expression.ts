@@ -335,6 +335,16 @@ export abstract class ExpressionParser extends BaseParser {
       };
     }
 
+    if (this.match("char")) {
+      const t = this.previous();
+      return {
+        kind: "Literal",
+        valueType: "char",
+        value: t.text,
+        ...this.rangeFrom(t, t),
+      };
+    }
+
     if (this.matchKeyword("true") || this.matchKeyword("false")) {
       const t = this.previous();
       return {

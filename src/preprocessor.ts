@@ -123,8 +123,8 @@ function expandLine(
   while (index < line.length) {
     const ch = line[index] ?? "";
 
-    if (ch === '"') {
-      const { text, nextIndex } = readStringLiteral(line, index);
+    if (ch === '"' || ch === "'") {
+      const { text, nextIndex } = readQuotedLiteral(line, index, ch);
       result += text;
       index = nextIndex;
       continue;
@@ -224,7 +224,7 @@ function normalizeCompatibilitySyntax(line: string): string {
 }
 
 function stripConstKeyword(line: string): string {
-  return line.replace(/^\s*const\s+(?=(int|long\s+long|double|bool|string|vector)\b)/, "");
+  return line.replace(/^\s*const\s+(?=(int|long\s+long|double|bool|char|string|vector)\b)/, "");
 }
 
 function normalizeScientificIntegerLiterals(line: string): string {
@@ -244,7 +244,11 @@ function normalizeIntegerLiteralSuffixes(line: string): string {
   return line.replace(/\b(\d+)(ULL|ull|UL|ul|LU|lu|LL|ll|L|l|U|u)\b/g, "$1");
 }
 
-function readStringLiteral(line: string, start: number): { text: string; nextIndex: number } {
+function readQuotedLiteral(
+  line: string,
+  start: number,
+  quote: '"' | "'",
+): { text: string; nextIndex: number } {
   let index = start + 1;
   while (index < line.length) {
     const ch = line[index] ?? "";
@@ -252,7 +256,7 @@ function readStringLiteral(line: string, start: number): { text: string; nextInd
       index += 2;
       continue;
     }
-    if (ch === '"') {
+    if (ch === quote) {
       index += 1;
       break;
     }
@@ -280,8 +284,8 @@ function readFunctionMacroInvocation(
 
   while (index < line.length) {
     const ch = line[index] ?? "";
-    if (ch === '"') {
-      const literal = readStringLiteral(line, index);
+    if (ch === '"' || ch === "'") {
+      const literal = readQuotedLiteral(line, index, ch);
       current += literal.text;
       index = literal.nextIndex;
       continue;

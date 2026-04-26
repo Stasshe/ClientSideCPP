@@ -350,6 +350,8 @@ export abstract class InterpreterRuntimeSupport extends InterpreterRuntimeTypeSu
         return { kind: "PrimitiveType", name: "double" };
       case "bool":
         return { kind: "PrimitiveType", name: "bool" };
+      case "char":
+        return { kind: "PrimitiveType", name: "char" };
       case "string":
         return { kind: "PrimitiveType", name: "string" };
       case "pair":

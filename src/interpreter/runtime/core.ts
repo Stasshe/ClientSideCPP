@@ -184,6 +184,9 @@ export abstract class InterpreterRuntimeCore {
 
   protected expectInt(value: RuntimeValue, line: number): Extract<RuntimeValue, { kind: "int" }> {
     const initialized = this.ensureInitialized(value, line, "value");
+    if (initialized.kind === "char") {
+      return { kind: "int", value: BigInt(initialized.value.codePointAt(0) ?? 0) };
+    }
     if (initialized.kind !== "int") {
       this.fail("type mismatch: expected int", line);
     }
@@ -219,6 +222,9 @@ export abstract class InterpreterRuntimeCore {
     }
     if (initialized.kind === "double") {
       return initialized.value !== 0;
+    }
+    if (initialized.kind === "char") {
+      return initialized.value !== "\0";
     }
     this.fail("cannot convert value to bool", line);
   }
@@ -276,6 +282,13 @@ export abstract class InterpreterRuntimeCore {
       this.writeAssignTarget(target, { kind: "string", value: token }, line);
       return;
     }
+    if (current.kind === "char") {
+      if (Array.from(token).length !== 1) {
+        this.fail(`cannot convert '${token}' to char`, line);
+      }
+      this.writeAssignTarget(target, { kind: "char", value: token }, line);
+      return;
+    }
     if (current.kind === "uninitialized") {
       const expectedType = current.expectedType;
       if (
@@ -290,6 +303,11 @@ export abstract class InterpreterRuntimeCore {
           this.fail(`cannot convert '${token}' to bool`, line);
         }
         this.writeAssignTarget(target, { kind: "bool", value: token === "1" }, line);
+      } else if (expectedType.kind === "PrimitiveType" && expectedType.name === "char") {
+        if (Array.from(token).length !== 1) {
+          this.fail(`cannot convert '${token}' to char`, line);
+        }
+        this.writeAssignTarget(target, { kind: "char", value: token }, line);
       } else {
         this.writeAssignTarget(target, { kind: "string", value: token }, line);
       }
@@ -379,9 +397,21 @@ export abstract class InterpreterRuntimeCore {
   protected normalizePrimitiveType(
     type: TypeNode,
     line: number,
-  ): "int" | "long long" | "double" | "bool" | "string" | "void" {
+  ): "int" | "long long" | "double" | "bool" | "char" | "string" | "void" {
     const primitive = this.expectPrimitiveType(type, line);
     return primitive.name;
+  }
+
+  protected intToChar(value: bigint, line: number): Extract<RuntimeValue, { kind: "char" }> {
+    const numeric = Number(value);
+    if (!Number.isSafeInteger(numeric) || numeric < 0 || numeric > 0x10ffff) {
+      this.fail("cannot convert 'int' to 'char'", line);
+    }
+    const text = String.fromCodePoint(numeric);
+    if (Array.from(text).length !== 1) {
+      this.fail("cannot convert 'int' to 'char'", line);
+    }
+    return { kind: "char", value: text };
   }
 
   protected abstract typeKindName(type: TypeNode): string;

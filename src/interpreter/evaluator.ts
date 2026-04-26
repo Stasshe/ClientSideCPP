@@ -22,6 +22,9 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         if (expr.valueType === "bool") {
           return { kind: "bool", value: expr.value as boolean };
         }
+        if (expr.valueType === "char") {
+          return { kind: "char", value: expr.value as string };
+        }
         return { kind: "string", value: expr.value as string };
       case "Identifier":
         if (expr.name === "endl") {
@@ -116,10 +119,13 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         }
         const delta = expr.operator === "++" ? 1n : -1n;
         const numericCurrent = this.expectInt(currentValue, expr.line);
-        const numericUpdated: RuntimeValue = {
-          kind: "int",
-          value: numericCurrent.value + delta,
-        };
+        const numericUpdated: RuntimeValue =
+          currentValue.kind === "char"
+            ? this.intToChar(numericCurrent.value + delta, expr.line)
+            : {
+                kind: "int",
+                value: numericCurrent.value + delta,
+              };
         this.writeLocation(targetLocation, numericUpdated, expr.line);
         return expr.isPostfix ? numericCurrent : numericUpdated;
       }
@@ -917,6 +923,12 @@ function compareValues(
         (right as { kind: "bool"; value: boolean }).value,
         operator,
       );
+    case "char":
+      return comparePrimitive(
+        left.value,
+        (right as { kind: "char"; value: string }).value,
+        operator,
+      );
     case "string":
       return comparePrimitive(
         left.value,
@@ -942,8 +954,8 @@ function compareValues(
 
 function isNumericRuntimeValue(
   value: Exclude<RuntimeValue, { kind: "void" | "uninitialized" }>,
-): value is Extract<RuntimeValue, { kind: "int" | "double" }> {
-  return value.kind === "int" || value.kind === "double";
+): value is Extract<RuntimeValue, { kind: "int" | "double" | "char" }> {
+  return value.kind === "int" || value.kind === "double" || value.kind === "char";
 }
 
 function toNumericOperands(
@@ -958,11 +970,18 @@ function toNumericOperands(
   if (left.kind === "double" || right.kind === "double") {
     return {
       mode: "double",
-      left: left.kind === "double" ? left.value : Number(left.value),
-      right: right.kind === "double" ? right.value : Number(right.value),
+      left: left.kind === "double" ? left.value : Number(toIntegerValue(left)),
+      right: right.kind === "double" ? right.value : Number(toIntegerValue(right)),
     };
   }
-  return { mode: "int", left: left.value, right: right.value };
+  return { mode: "int", left: toIntegerValue(left), right: toIntegerValue(right) };
+}
+
+function toIntegerValue(value: Extract<RuntimeValue, { kind: "int" | "double" | "char" }>): bigint {
+  if (value.kind === "int") {
+    return value.value;
+  }
+  return BigInt(value.kind === "char" ? (value.value.codePointAt(0) ?? 0) : value.value);
 }
 
 function comparePrimitive<T extends bigint | number | boolean | string>(

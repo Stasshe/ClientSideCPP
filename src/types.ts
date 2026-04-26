@@ -1,4 +1,11 @@
-export type PrimitiveTypeName = "int" | "long long" | "double" | "bool" | "string" | "void";
+export type PrimitiveTypeName =
+  | "int"
+  | "long long"
+  | "double"
+  | "bool"
+  | "char"
+  | "string"
+  | "void";
 
 export type PrimitiveTypeNode = {
   kind: "PrimitiveType";
@@ -211,7 +218,11 @@ export type ExprNode =
   | IdentifierExprNode
   | LiteralExprNode;
 
-export type AssignTargetNode = IdentifierExprNode | IndexExprNode | DerefExprNode | TupleGetExprNode;
+export type AssignTargetNode =
+  | IdentifierExprNode
+  | IndexExprNode
+  | DerefExprNode
+  | TupleGetExprNode;
 
 export type AssignExprNode = NodeBase & {
   kind: "AssignExpr";
@@ -302,11 +313,11 @@ export type IdentifierExprNode = NodeBase & {
 
 export type LiteralExprNode = NodeBase & {
   kind: "Literal";
-  valueType: "int" | "double" | "bool" | "string";
+  valueType: "int" | "double" | "bool" | "char" | "string";
   value: bigint | number | boolean | string;
 };
 
-export type TokenKind = "identifier" | "keyword" | "number" | "string" | "symbol" | "eof";
+export type TokenKind = "identifier" | "keyword" | "number" | "string" | "char" | "symbol" | "eof";
 
 export type Token = SourceRange & {
   kind: TokenKind;
@@ -347,6 +358,7 @@ export type DebugValueView = {
     | "int"
     | "double"
     | "bool"
+    | "char"
     | "string"
     | "pair"
     | "tuple"
