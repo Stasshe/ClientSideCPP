@@ -487,10 +487,11 @@ cerr << "debug: " << x << "\n";
 
 ### 10.1 コンパイルエラー
 
-パース・型チェック段階で検出。GCC のエラーメッセージ形式に準拠：
+パース・型チェック段階で検出。GCC / Clang のエラーメッセージ形式に準拠する。
+単一ファイル実行が前提なので、既定のファイル名は `main.cpp` とする。
 
 ```
-<filename>:<line>:<col>: error: <message>
+main.cpp:<line>:<col>: error: <message>
 ```
 
 | 種別 | メッセージ例 |
@@ -510,11 +511,13 @@ cerr << "debug: " << x << "\n";
 
 ### 10.2 実行時エラー
 
-実行中に検出。現在の実装では、エラー位置の 1 フレームだけを付けて返す。
+実行中に検出。`Runtime Error: ...` の見出しと、leaf-first の stack trace を返す。
 
 ```
 Runtime Error: <message>
-  at <function>:<line>
+  at <callee>:<line>
+  at <caller>:<line>
+  ...
 ```
 
 | 種別 | メッセージ |
@@ -526,7 +529,32 @@ Runtime Error: <message>
 | 条件式の型不正 | `Runtime Error: cannot convert value to bool` |
 | `double` から `int` への不正変換 | `Runtime Error: cannot convert 'double' to 'int'` |
 
-### 10.3 警告
+### 10.3 エラー情報の構造
+
+外部 API では、エラーは整形済み文字列だけでなく構造化データとしても返す。
+
+```typescript
+type RuntimeStackFrame = {
+  functionName: string
+  line: number
+}
+
+type RuntimeErrorInfo = {
+  message: string        // 整形済み全文
+  summary: string        // 先頭行に相当する要約
+  line: number           // 最上位フレームの行番号
+  col: number | null     // compile error のみ列番号を持つ
+  functionName: string   // compile error では "<compile>"
+  filename: string | null
+  stack: RuntimeStackFrame[]
+}
+```
+
+- compile error では `filename` に `main.cpp` が入り、`stack` は空
+- runtime error では `filename` は `null`、`stack` に `callee` から `main` までのフレーム列が入る
+- `message` は UI 表示用、`summary` と `stack` は機械処理用と考える
+
+### 10.4 警告
 
 エラーではないが UI 上に表示する。
 
@@ -579,6 +607,7 @@ type ArrayStore = {
 - 関数呼び出し履歴は `frameStack: Frame[]` で管理する
 - 固定長配列と `vector` の実体は `Map<ArrayId, ArrayStore>` に保持する
 - 多次元固定長配列は内部的には平坦化した 1 次元ストレージとして管理する
+- 実行時エラー発生時は `frameStack` をもとに stack trace を組み立て、最内周フレームから順に露出する
 
 ### 11.3 名前解決
 

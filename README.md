@@ -197,8 +197,9 @@ without ceremony.
 
 ## Errors
 
-**Compile errors** follow GCC/Clang format, so what you learn here
+**Compile errors** follow Clang format, so what you learn here
 transfers directly to a real toolchain:
+Maybe I will change this into GCC format in the future. 
 
 ```
 main.cpp:7:14: error: 'x' was not declared in this scope

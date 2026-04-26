@@ -6,26 +6,29 @@
 src/
 ├── index.ts
 ├── compiler.ts
+├── diagnostics.ts
 ├── preprocessor.ts
 ├── types.ts
 ├── parser/
 │   ├── index.ts
 │   ├── lexer.ts
 │   ├── expression.ts
-│   ├── base-parser.ts
-│   ├── base-parser-core.ts
-│   ├── base-parser-type-support.ts
-│   └── base-parser-support.ts
+│   └── base/
+│       ├── index.ts
+│       ├── core.ts
+│       ├── type-support.ts
+│       └── support.ts
 ├── runtime/
 │   ├── errors.ts
 │   └── value.ts
 ├── interpreter/
 │   ├── index.ts
 │   ├── evaluator.ts
-│   ├── interpreter-runtime.ts
-│   ├── interpreter-runtime-core.ts
-│   ├── interpreter-runtime-type-support.ts
-│   └── interpreter-runtime-support.ts
+│   └── runtime/
+│       ├── index.ts
+│       ├── core.ts
+│       ├── type-support.ts
+│       └── support.ts
 ├── semantic/
 │   └── validator.ts
 └── debugger/
@@ -40,6 +43,7 @@ src/
 - 逆に、責務が複数にまたがるなら分割する。
 - parser / interpreter のような中核モジュールは、入口の高レベル制御と低レベル支援を別ファイルに分ける
 - さらに支援層が大きくなったら、型処理と storage/location 処理のようにデータ責務で分割する
+- 診断整形は `diagnostics.ts` に集約する。compile/runtime/debugger でエラー文字列を個別実装しない
 
 ## 型
 
@@ -99,6 +103,14 @@ function add(a: Value, b: Value): Value {
 - 言語機能を追加・変更したら `SPECIFICATION.md` と `tests/` を同じコミットで更新する
 - この処理系は「競プロで頻出の C++ 断片を安全に再現するサブセット」であり、C++ 全体の完全再現は目指さない
 - ただし一度対応すると決めた機能は、糖衣構文だけでなく意味論・デバッグ表示・テストまで揃える
+- エラー仕様を変えたら `README.md` も同時に更新する。ユーザー向けの診断例は実装とずらさない
+
+## エラー実装
+
+- compile error は GCC / Clang 形式の `main.cpp:<line>:<col>: error: ...` を既定とする
+- runtime error は `Runtime Error: ...` に続けて leaf-first の stack trace を載せる
+- `RuntimeErrorInfo` は整形済み `message` だけでなく、`summary`、`filename`、`stack` を持つ
+- `RuntimeTrap` から `RuntimeErrorInfo` への変換は `diagnostics.ts` に寄せる
 
 ## モジュール間の依存方向
 
