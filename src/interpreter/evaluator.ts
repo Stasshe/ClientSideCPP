@@ -1,11 +1,11 @@
-import type { RuntimeLocation, RuntimeValue } from "../runtime/value";
-import type { AssignTargetNode, BinaryExprNode, ExprNode, FunctionDeclNode } from "../types";
-import { isReferenceType } from "../types";
-import { InterpreterRuntime } from "./interpreter-runtime";
+import type { RuntimeLocation, RuntimeValue } from "@/runtime/value";
+import type { AssignTargetNode, BinaryExprNode, ExprNode, FunctionDeclNode } from "@/types";
+import { isReferenceType } from "@/types";
+import { InterpreterRuntime } from "./runtime";
 
 export type RuntimeArgument =
   | { kind: "value"; value: RuntimeValue }
-  | { kind: "reference"; target: RuntimeLocation; type: import("../types").TypeNode };
+  | { kind: "reference"; target: RuntimeLocation; type: import("@/types").TypeNode };
 
 export abstract class InterpreterEvaluator extends InterpreterRuntime {
   protected evaluateExpr(expr: ExprNode): RuntimeValue {
@@ -819,7 +819,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
   ): {
     store: {
       values: RuntimeValue[];
-      type: { kind: "VectorType"; elementType: import("../types").TypeNode };
+      type: { kind: "VectorType"; elementType: import("@/types").TypeNode };
     };
   } {
     const minArgs = callee === "fill" ? 3 : 2;
@@ -866,7 +866,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
     return {
       store: store as {
         values: RuntimeValue[];
-        type: { kind: "VectorType"; elementType: import("../types").TypeNode };
+        type: { kind: "VectorType"; elementType: import("@/types").TypeNode };
       },
     };
   }

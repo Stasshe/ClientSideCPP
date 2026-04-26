@@ -1,4 +1,4 @@
-import type { CompileError, Token } from "../types";
+import type { CompileError, Token } from "@/types";
 
 const KEYWORDS = new Set<string>([
   "int",

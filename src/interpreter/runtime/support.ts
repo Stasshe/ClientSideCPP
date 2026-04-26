@@ -1,7 +1,7 @@
-import type { RuntimeLocation, RuntimeValue } from "../runtime/value";
-import type { ArrayTypeNode, ExprNode, TypeNode } from "../types";
-import type { Scope } from "./interpreter-runtime-core";
-import { InterpreterRuntimeTypeSupport } from "./interpreter-runtime-type-support";
+import type { RuntimeLocation, RuntimeValue } from "@/runtime/value";
+import type { ArrayTypeNode, ExprNode, TypeNode } from "@/types";
+import type { Scope } from "./core";
+import { InterpreterRuntimeTypeSupport } from "./type-support";
 
 export abstract class InterpreterRuntimeSupport extends InterpreterRuntimeTypeSupport {
   protected override defineInScope(

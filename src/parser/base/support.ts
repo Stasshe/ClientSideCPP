@@ -8,8 +8,8 @@ import type {
   TypeNode,
   VarDeclNode,
   VectorDeclNode,
-} from "../types";
-import { BaseParserTypeSupport } from "./base-parser-type-support";
+} from "@/types";
+import { BaseParserTypeSupport } from "./type-support";
 
 const UNSUPPORTED_TEMPLATE_TYPES = new Set<string>([
   "unordered_map",
@@ -230,8 +230,8 @@ export abstract class BaseParserSupport extends BaseParserTypeSupport {
     };
   }
 
-  protected parseParams(): import("../types").FunctionDeclNode["params"] {
-    const params: import("../types").FunctionDeclNode["params"] = [];
+  protected parseParams(): import("@/types").FunctionDeclNode["params"] {
+    const params: import("@/types").FunctionDeclNode["params"] = [];
 
     if (this.matchSymbol(")")) {
       return params;

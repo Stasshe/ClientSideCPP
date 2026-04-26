@@ -5,7 +5,7 @@ import type {
   TupleTypeNode,
   TypeNode,
   VectorTypeNode,
-} from "../types";
+} from "@/types";
 
 export type RuntimeLocation =
   | { kind: "binding"; scope: Map<string, RuntimeValue>; name: string; type: TypeNode }

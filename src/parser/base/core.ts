@@ -1,4 +1,4 @@
-import type { BlockStmtNode, CompileError, ExprNode, SourceRange, Token } from "../types";
+import type { BlockStmtNode, CompileError, ExprNode, SourceRange, Token } from "@/types";
 
 export abstract class BaseParserCore {
   protected readonly tokens: Token[];
@@ -210,5 +210,5 @@ export abstract class BaseParserCore {
     };
   }
 
-  protected abstract parseStatement(): import("../types").StatementNode | null;
+  protected abstract parseStatement(): import("@/types").StatementNode | null;
 }

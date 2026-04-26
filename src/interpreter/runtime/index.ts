@@ -1,23 +1,23 @@
-import type { RuntimeTrap } from "../runtime/errors";
-import type { RuntimeValue } from "../runtime/value";
+import type { RuntimeTrap } from "@/runtime/errors";
+import type { RuntimeValue } from "@/runtime/value";
 import type {
   DebugExecutionRange,
   DebugInfo,
   DebugValueView,
   FrameView,
   RuntimeErrorInfo,
-} from "../types";
-import { typeToString } from "../types";
-import type { ArrayStore, Scope } from "./interpreter-runtime-core";
-import { InterpreterRuntimeSupport } from "./interpreter-runtime-support";
+} from "@/types";
+import { typeToString } from "@/types";
+import type { ArrayStore, Scope } from "./core";
+import { InterpreterRuntimeSupport } from "./support";
 
 export type {
   ArrayStore,
   InterpreterOptions,
   InterpreterStepInfo,
   Scope,
-} from "./interpreter-runtime-core";
-export { PauseTrap } from "./interpreter-runtime-core";
+} from "./core";
+export { PauseTrap } from "./core";
 
 export abstract class InterpreterRuntime extends InterpreterRuntimeSupport {}
 

@@ -1,6 +1,6 @@
-import { BreakSignal, ContinueSignal, ReturnSignal, RuntimeTrap } from "../runtime/errors";
-import type { RuntimeValue } from "../runtime/value";
-import { stringifyValue, uninitializedForType } from "../runtime/value";
+import { BreakSignal, ContinueSignal, ReturnSignal, RuntimeTrap } from "@/runtime/errors";
+import type { RuntimeValue } from "@/runtime/value";
+import { stringifyValue, uninitializedForType } from "@/runtime/value";
 import type {
   DebugInfo,
   DebugState,
@@ -11,17 +11,17 @@ import type {
   RunResult,
   RuntimeErrorInfo,
   StatementNode,
-} from "../types";
-import type { RuntimeArgument } from "./interpreter-evaluator";
-import { InterpreterEvaluator } from "./interpreter-evaluator";
+} from "@/types";
+import type { RuntimeArgument } from "./evaluator";
+import { InterpreterEvaluator } from "./evaluator";
 import {
   buildDebugInfoView,
   type InterpreterOptions,
   PauseTrap,
   toRuntimeError,
-} from "./interpreter-runtime";
+} from "./runtime";
 
-export type { InterpreterOptions, InterpreterStepInfo } from "./interpreter-runtime";
+export type { InterpreterOptions, InterpreterStepInfo } from "./runtime";
 
 export function runProgram(
   program: ProgramNode,

@@ -7,8 +7,8 @@ import type {
   Token,
   VarDeclNode,
   VectorDeclNode,
-} from "../types";
-import { BaseParserSupport, isAssignTarget } from "./base-parser-support";
+} from "@/types";
+import { BaseParserSupport, isAssignTarget } from "./support";
 
 export abstract class BaseParser extends BaseParserSupport {
   protected override parseStatement(): StatementNode | null {
@@ -54,9 +54,9 @@ export abstract class BaseParser extends BaseParserSupport {
         return null;
       }
 
-      const branches: Array<{ condition: ExprNode; thenBlock: import("../types").BlockStmtNode }> =
+      const branches: Array<{ condition: ExprNode; thenBlock: import("@/types").BlockStmtNode }> =
         [{ condition, thenBlock }];
-      let elseBlock: import("../types").BlockStmtNode | null = null;
+      let elseBlock: import("@/types").BlockStmtNode | null = null;
 
       while (this.checkKeyword("else") && this.checkNextKeyword("if")) {
         this.advance();

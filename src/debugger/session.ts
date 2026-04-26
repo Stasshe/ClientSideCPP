@@ -1,6 +1,6 @@
-import { compile, formatCompileErrors } from "../compiler";
-import { buildDebugState, runProgram } from "../interpreter/interpreter";
-import type { DebugState, RunResult } from "../types";
+import { compile, formatCompileErrors } from "@/compiler";
+import { buildDebugState, runProgram } from "@/interpreter";
+import type { DebugState, RunResult } from "@/types";
 
 type ResumeMode =
   | { kind: "stepInto" }

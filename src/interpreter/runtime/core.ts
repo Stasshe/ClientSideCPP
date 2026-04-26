@@ -1,5 +1,5 @@
-import { RuntimeTrap } from "../runtime/errors";
-import type { RuntimeLocation, RuntimeValue } from "../runtime/value";
+import { RuntimeTrap } from "@/runtime/errors";
+import type { RuntimeLocation, RuntimeValue } from "@/runtime/value";
 import type {
   ArrayDeclNode,
   AssignTargetNode,
@@ -12,12 +12,12 @@ import type {
   SourceRange,
   TypeNode,
   VectorDeclNode,
-} from "../types";
-import { isPrimitiveType } from "../types";
+} from "@/types";
+import { isPrimitiveType } from "@/types";
 
 export type Scope = Map<string, RuntimeValue>;
 export type ArrayStore = {
-  type: import("../types").ArrayTypeNode | import("../types").VectorTypeNode;
+  type: import("@/types").ArrayTypeNode | import("@/types").VectorTypeNode;
   values: RuntimeValue[];
 };
 
@@ -101,7 +101,7 @@ export abstract class InterpreterRuntimeCore {
   ): RuntimeValue;
 
   protected abstract createFixedArrayValue(
-    type: import("../types").ArrayTypeNode,
+    type: import("@/types").ArrayTypeNode,
     dimensions: bigint[],
     line: number,
   ): RuntimeValue;
@@ -385,7 +385,7 @@ export abstract class InterpreterRuntimeCore {
   ): void;
 
   protected allocateArray(
-    type: import("../types").ArrayTypeNode | import("../types").VectorTypeNode,
+    type: import("@/types").ArrayTypeNode | import("@/types").VectorTypeNode,
     values: RuntimeValue[],
   ): RuntimeValue {
     const ref = this.nextArrayRef;

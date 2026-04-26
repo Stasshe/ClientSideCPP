@@ -1,9 +1,9 @@
-import type { RuntimeValue } from "../runtime/value";
-import { stringifyValue } from "../runtime/value";
-import type { DebugValueView, TypeNode } from "../types";
-import { isPointerType, isPrimitiveType, isReferenceType, typeToString } from "../types";
-import type { Scope } from "./interpreter-runtime-core";
-import { InterpreterRuntimeCore } from "./interpreter-runtime-core";
+import type { RuntimeValue } from "@/runtime/value";
+import { stringifyValue } from "@/runtime/value";
+import type { DebugValueView, TypeNode } from "@/types";
+import { isPointerType, isPrimitiveType, isReferenceType, typeToString } from "@/types";
+import type { Scope } from "./core";
+import { InterpreterRuntimeCore } from "./core";
 
 export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCore {
   protected castToElementType(value: RuntimeValue, type: TypeNode, line: number): RuntimeValue {

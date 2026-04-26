@@ -7,8 +7,8 @@ import type {
   RangeForStmtNode,
   StatementNode,
   TypeNode,
-} from "../types";
-import { isPointerType, isPrimitiveType, isReferenceType, typeToString } from "../types";
+} from "@/types";
+import { isPointerType, isPrimitiveType, isReferenceType, typeToString } from "@/types";
 
 type ValidationContext = {
   errors: CompileError[];

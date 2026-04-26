@@ -1,4 +1,4 @@
-import type { ArrayDeclNode, PrimitiveTypeNode, Token, TypeNode, VectorDeclNode } from "../types";
+import type { ArrayDeclNode, PrimitiveTypeNode, Token, TypeNode, VectorDeclNode } from "@/types";
 import {
   arrayType,
   isPrimitiveType,
@@ -8,8 +8,8 @@ import {
   referenceType,
   tupleType,
   vectorType,
-} from "../types";
-import { BaseParserCore } from "./base-parser-core";
+} from "@/types";
+import { BaseParserCore } from "./core";
 
 const TYPE_KEYWORDS = new Set<string>(["int", "long", "double", "bool", "string", "void"]);
 

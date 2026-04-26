@@ -1,7 +1,7 @@
-import type { CompileResult, GlobalDeclNode, ProgramNode, Token } from "../types";
-import { pointerType, referenceType } from "../types";
-import { tokensStart } from "./base-parser";
-import { ExpressionParser } from "./expression-parser";
+import type { CompileResult, GlobalDeclNode, ProgramNode, Token } from "@/types";
+import { pointerType, referenceType } from "@/types";
+import { tokensStart } from "./base/index";
+import { ExpressionParser } from "./expression";
 
 export function parse(tokens: Token[]): CompileResult {
   const parser = new Parser(tokens);

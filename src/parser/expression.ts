@@ -7,8 +7,8 @@ import type {
   ExprNode,
   TupleGetExprNode,
   UnaryExprNode,
-} from "../types";
-import { BaseParser, isAssignTarget } from "./base-parser";
+} from "@/types";
+import { BaseParser, isAssignTarget } from "./base";
 
 export abstract class ExpressionParser extends BaseParser {
   protected parseExpression(): ExprNode {

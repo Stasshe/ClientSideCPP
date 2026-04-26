@@ -1,4 +1,4 @@
-import type { CompileError } from "./types";
+import type { CompileError } from "@/types";
 
 type ObjectMacro = {
   kind: "object";
