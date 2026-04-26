@@ -428,6 +428,23 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
       }
       return pointerType.pointeeType;
     }
+    case "VectorCtorExpr": {
+      if (expr.args.length >= 1) {
+        validateExpr(expr.args[0] ?? null, context, "int");
+      }
+      if (expr.args.length >= 2) {
+        validateExpr(expr.args[1] ?? null, context, expr.type.elementType);
+      }
+      if (expr.args.length > 2) {
+        pushError(
+          context,
+          expr.line,
+          expr.col,
+          "too many arguments for vector constructor",
+        );
+      }
+      return expr.type;
+    }
     case "AssignExpr": {
       const targetType = inferLValueType(expr.target, context);
       let valueType: TypeNode | null;

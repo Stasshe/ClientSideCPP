@@ -153,33 +153,37 @@ export abstract class InterpreterRuntimeCore {
 
   protected defineVectorDecl(decl: VectorDeclNode, scope: Scope): void {
     const args = decl.constructorArgs.map((arg) => this.evaluateExpr(arg));
+    const vectorValue = this.constructVectorValue(decl.type, args, decl.line);
+    this.defineInScope(scope, decl.name, vectorValue, decl.line);
+  }
+
+  protected constructVectorValue(
+    type: VectorDeclNode["type"],
+    args: RuntimeValue[],
+    line: number,
+  ): RuntimeValue {
     let values: RuntimeValue[] = [];
 
     if (args.length === 1) {
-      const size = this.expectInt(args[0] as RuntimeValue, decl.line).value;
+      const size = this.expectInt(args[0] as RuntimeValue, line).value;
       if (size < 0n) {
-        this.fail("vector size must be non-negative", decl.line);
+        this.fail("vector size must be non-negative", line);
       }
       values = Array.from({ length: Number(size) }, () =>
-        this.defaultValueForType(decl.type.elementType, decl.line),
+        this.defaultValueForType(type.elementType, line),
       );
     } else if (args.length === 2) {
-      const size = this.expectInt(args[0] as RuntimeValue, decl.line).value;
+      const size = this.expectInt(args[0] as RuntimeValue, line).value;
       if (size < 0n) {
-        this.fail("vector size must be non-negative", decl.line);
+        this.fail("vector size must be non-negative", line);
       }
-      const fillValue = this.castToElementType(
-        args[1] as RuntimeValue,
-        decl.type.elementType,
-        decl.line,
-      );
+      const fillValue = this.castToElementType(args[1] as RuntimeValue, type.elementType, line);
       values = Array.from({ length: Number(size) }, () => fillValue);
     } else if (args.length > 2) {
-      this.fail("too many arguments for vector constructor", decl.line);
+      this.fail("too many arguments for vector constructor", line);
     }
 
-    const vectorValue = this.allocateArray(decl.type, values);
-    this.defineInScope(scope, decl.name, vectorValue, decl.line);
+    return this.allocateArray(type, values);
   }
 
   protected expectInt(value: RuntimeValue, line: number): Extract<RuntimeValue, { kind: "int" }> {

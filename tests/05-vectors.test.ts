@@ -198,6 +198,24 @@ int main() {
     expect(result.output.stdout).toBe("9\n");
   });
 
+  it("supports nested vector fill constructors with chars", () => {
+    const source = `
+int main() {
+  int H = 2;
+  int W = 3;
+  vector<vector<char>> s(H, vector<char>(W));
+  s[0][1] = 'x';
+  s[1][2] = 'y';
+  cout << s[0][1] << " " << s[1][2] << "\\n";
+  cout << s[0].size() << " " << s[1].size() << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("x y\n3 3\n");
+  });
+
   it("builtins abs max min swap", () => {
     const source = `
 int main() {

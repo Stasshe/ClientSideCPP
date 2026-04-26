@@ -44,6 +44,10 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         const location = this.resolvePointerLocation(expr.pointer, expr.line);
         return this.readLocation(location, expr.line);
       }
+      case "VectorCtorExpr": {
+        const args = expr.args.map((arg) => this.evaluateExpr(arg));
+        return this.constructVectorValue(expr.type, args, expr.line);
+      }
       case "CallExpr": {
         const fn = this.functions.get(expr.callee);
         if (fn !== undefined) {
@@ -1075,6 +1079,8 @@ function sameReceiver(left: ExprNode, right: ExprNode): boolean {
     case "AssignExpr":
       return false;
     case "ConditionalExpr":
+      return false;
+    case "VectorCtorExpr":
       return false;
     case "TupleGetExpr":
       return false;

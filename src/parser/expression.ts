@@ -7,6 +7,7 @@ import type {
   ExprNode,
   TupleGetExprNode,
   UnaryExprNode,
+  VectorCtorExprNode,
 } from "@/types";
 import { BaseParser, isAssignTarget } from "./base";
 
@@ -302,6 +303,11 @@ export abstract class ExpressionParser extends BaseParser {
       return greaterComparator;
     }
 
+    const vectorCtor = this.parseVectorCtorExpr();
+    if (vectorCtor !== null) {
+      return vectorCtor;
+    }
+
     const tupleGet = this.parseTupleGetExpr();
     if (tupleGet !== null) {
       return tupleGet;
@@ -380,6 +386,45 @@ export abstract class ExpressionParser extends BaseParser {
     }
 
     return null;
+  }
+
+  private parseVectorCtorExpr(): ExprNode | null {
+    const startIndex = this.index;
+    const startToken = this.tokens[startIndex];
+    if (!this.checkKeyword("vector") || startToken === undefined) {
+      return null;
+    }
+
+    const type = this.parseVectorType();
+    if (type === null) {
+      this.index = startIndex;
+      return null;
+    }
+    if (!this.matchSymbol("(")) {
+      this.index = startIndex;
+      return null;
+    }
+
+    const args: ExprNode[] = [];
+    if (!this.matchSymbol(")")) {
+      while (true) {
+        args.push(this.parseExpression());
+        if (this.matchSymbol(")")) {
+          break;
+        }
+        if (!this.consumeSymbol(",", "expected ',' or ')' in vector constructor args")) {
+          return null;
+        }
+      }
+    }
+
+    const node: VectorCtorExprNode = {
+      kind: "VectorCtorExpr",
+      type,
+      args,
+      ...this.rangeToPrevious(startToken),
+    };
+    return node;
   }
 
   private parseTupleGetExpr(): ExprNode | null {

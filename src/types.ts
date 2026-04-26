@@ -211,6 +211,7 @@ export type ExprNode =
   | UnaryExprNode
   | AddressOfExprNode
   | DerefExprNode
+  | VectorCtorExprNode
   | CallExprNode
   | TupleGetExprNode
   | MethodCallExprNode
@@ -279,6 +280,12 @@ export type AddressOfExprNode = NodeBase & {
 export type DerefExprNode = NodeBase & {
   kind: "DerefExpr";
   pointer: ExprNode;
+};
+
+export type VectorCtorExprNode = NodeBase & {
+  kind: "VectorCtorExpr";
+  type: VectorTypeNode;
+  args: ExprNode[];
 };
 
 export type CallExprNode = NodeBase & {
