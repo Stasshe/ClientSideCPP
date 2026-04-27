@@ -10,7 +10,6 @@ import {
   describeBuiltinArity,
   getBuiltinFreeFunctionSpec,
   getBuiltinTemplateComparatorSpec,
-  getSupportedTemplateTypeSpec,
 } from "@/stdlib/registry";
 import {
   getSingleIntTemplateArg,
@@ -201,10 +200,7 @@ export function evaluateTemplateCall(
     return ctx.fail(`'${expr.callee.template}' was not declared in this scope`, expr.line);
   }
 
-  if (
-    getSupportedTemplateTypeSpec(expr.callee.template) !== null &&
-    expr.callee.template === "vector"
-  ) {
+  if (isTemplateNamed(expr.callee, "vector")) {
     const elementType = getSingleTypeTemplateArg(expr.callee);
     if (elementType === null) {
       ctx.fail("vector constructor requires exactly 1 type argument", expr.line);

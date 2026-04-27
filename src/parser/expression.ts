@@ -1,4 +1,4 @@
-import { getBuiltinTemplateComparatorSpec } from "@/stdlib/registry";
+import { getBuiltinTemplateComparatorSpec, isSupportedTemplateTypeName } from "@/stdlib/registry";
 import type {
   AddressOfExprNode,
   AssignExprNode,
@@ -399,12 +399,7 @@ export abstract class ExpressionParser extends BaseParser {
       token?.kind === "identifier" ? getBuiltinTemplateComparatorSpec(token.text) : null;
     if (
       !(token?.kind === "identifier" || token?.kind === "keyword") ||
-      (comparator === null &&
-        token.text !== "get" &&
-        !this.checkKeyword("vector") &&
-        !this.checkKeyword("map") &&
-        !this.checkKeyword("pair") &&
-        !this.checkKeyword("tuple")) ||
+      (comparator === null && token.text !== "get" && !isSupportedTemplateTypeName(token.text)) ||
       next?.kind !== "symbol" ||
       next.text !== "<"
     ) {
@@ -433,7 +428,7 @@ export abstract class ExpressionParser extends BaseParser {
 
   private parseTemplateExprArguments(templateName: string): TemplateArgNode[] | null {
     const args: TemplateArgNode[] = [];
-    if (templateName === "greater" && this.checkSymbol(">")) {
+    if (getBuiltinTemplateComparatorSpec(templateName) !== null && this.checkSymbol(">")) {
       return args;
     }
     while (true) {

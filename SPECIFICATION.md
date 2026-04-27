@@ -340,11 +340,13 @@ for (;;) { ... }   // 無限ループ
 for (auto x : v) { ... }
 for (auto& x : v) { ... }
 for (int x : a) { ... }
+for (auto& p : m) { ... }  // map: p は pair<K, V>
 ```
 
-- 走査対象は固定長配列・`vector`・`string`
+- 走査対象は固定長配列・`vector`・`map`・`string`
 - `auto&` や `T&` を使うと、ループ変数への代入が元要素に反映される
-- `string` を走査する場合、要素は長さ 1 の `string`
+- `map` を走査する場合、要素は `pair<K, V>`
+- `string` を走査する場合、要素は `char`
 
 ### 6.4 `while`
 

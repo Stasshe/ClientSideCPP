@@ -3,7 +3,6 @@ import {
   describeBuiltinArity,
   getBuiltinFreeFunctionSpec,
   getBuiltinTemplateComparatorSpec,
-  getSupportedTemplateTypeSpec,
 } from "@/stdlib/registry";
 import {
   getSingleIntTemplateArg,
@@ -232,10 +231,7 @@ export function validateTemplateCall(
     return null;
   }
 
-  if (
-    getSupportedTemplateTypeSpec(expr.callee.template) !== null &&
-    expr.callee.template === "vector"
-  ) {
+  if (isTemplateNamed(expr.callee, "vector")) {
     const elementType = getSingleTypeTemplateArg(expr.callee);
     if (elementType === null) {
       pushError(
