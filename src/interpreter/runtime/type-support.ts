@@ -1,5 +1,13 @@
 import type { RuntimeValue } from "@/runtime/value";
 import { stringifyValue } from "@/runtime/value";
+import {
+  mapKeyType,
+  mapValueType,
+  pairFirstType,
+  pairSecondType,
+  tupleElementTypes,
+  vectorElementType,
+} from "@/stdlib/template-types";
 import type { DebugValueView, TypeNode } from "@/types";
 import {
   isArrayType,
@@ -53,15 +61,15 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
       return {
         kind: "pair",
         type,
-        first: this.defaultValueForType(type.firstType, line),
-        second: this.defaultValueForType(type.secondType, line),
+        first: this.defaultValueForType(pairFirstType(type), line),
+        second: this.defaultValueForType(pairSecondType(type), line),
       };
     }
     if (isTupleType(type)) {
       return {
         kind: "tuple",
         type,
-        values: type.elementTypes.map((elementType) => this.defaultValueForType(elementType, line)),
+        values: tupleElementTypes(type).map((elementType) => this.defaultValueForType(elementType, line)),
       };
     }
     this.fail("fixed array value requires dimensions", line);
@@ -124,8 +132,8 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
       return {
         kind: "pair",
         type,
-        first: this.assertType(type.firstType, value.first, line),
-        second: this.assertType(type.secondType, value.second, line),
+        first: this.assertType(pairFirstType(type), value.first, line),
+        second: this.assertType(pairSecondType(type), value.second, line),
       };
     }
 
@@ -140,8 +148,8 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
         kind: "map",
         type,
         entries: value.entries.map((entry) => ({
-          key: this.assertType(type.keyType, entry.key, line),
-          value: this.assertType(type.valueType, entry.value, line),
+          key: this.assertType(mapKeyType(type), entry.key, line),
+          value: this.assertType(mapValueType(type), entry.value, line),
         })),
       };
     }
@@ -153,7 +161,8 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
       if (value.kind !== "tuple") {
         this.fail(`cannot convert '${value.kind}' to '${this.typeKindName(type)}'`, line);
       }
-      if (value.values.length !== type.elementTypes.length) {
+      const elementTypes = tupleElementTypes(type);
+      if (value.values.length !== elementTypes.length) {
         this.fail(
           `cannot convert '${this.typeToRuntimeString(value.type)}' to '${this.typeToRuntimeString(type)}'`,
           line,
@@ -162,7 +171,7 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
       return {
         kind: "tuple",
         type,
-        values: type.elementTypes.map((elementType, index) =>
+        values: elementTypes.map((elementType, index) =>
           this.assertType(elementType, value.values[index] as RuntimeValue, line),
         ),
       };
@@ -183,7 +192,10 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
     if (
       (isArrayType(type) || isVectorType(type)) &&
       (isArrayType(value.type) || isVectorType(value.type)) &&
-      !this.sameType(type.elementType, value.type.elementType)
+      !this.sameType(
+        isArrayType(type) ? type.elementType : vectorElementType(type),
+        isArrayType(value.type) ? value.type.elementType : vectorElementType(value.type),
+      )
     ) {
       this.fail(
         `cannot convert '${this.typeToRuntimeString(value.type)}' to '${this.typeToRuntimeString(type)}'`,
@@ -309,31 +321,37 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
       return isArrayType(left) && isArrayType(right) && this.sameType(left.elementType, right.elementType);
     }
     if (isVectorType(left) || isVectorType(right)) {
-      return isVectorType(left) && isVectorType(right) && this.sameType(left.elementType, right.elementType);
+      return (
+        isVectorType(left) &&
+        isVectorType(right) &&
+        this.sameType(vectorElementType(left), vectorElementType(right))
+      );
     }
     if (isMapType(left) || isMapType(right)) {
       return (
         isMapType(left) &&
         isMapType(right) &&
-        this.sameType(left.keyType, right.keyType) &&
-        this.sameType(left.valueType, right.valueType)
+        this.sameType(mapKeyType(left), mapKeyType(right)) &&
+        this.sameType(mapValueType(left), mapValueType(right))
       );
     }
     if (isPairType(left) || isPairType(right)) {
       return (
         isPairType(left) &&
         isPairType(right) &&
-        this.sameType(left.firstType, right.firstType) &&
-        this.sameType(left.secondType, right.secondType)
+        this.sameType(pairFirstType(left), pairFirstType(right)) &&
+        this.sameType(pairSecondType(left), pairSecondType(right))
       );
     }
     if (isTupleType(left) || isTupleType(right)) {
+      const leftElements = isTupleType(left) ? tupleElementTypes(left) : [];
+      const rightElements = isTupleType(right) ? tupleElementTypes(right) : [];
       return (
         isTupleType(left) &&
         isTupleType(right) &&
-        left.elementTypes.length === right.elementTypes.length &&
-        left.elementTypes.every((elementType, index) => {
-          const rightElementType = right.elementTypes[index];
+        leftElements.length === rightElements.length &&
+        leftElements.every((elementType, index) => {
+          const rightElementType = rightElements[index];
           return rightElementType !== undefined && this.sameType(elementType, rightElementType);
         })
       );

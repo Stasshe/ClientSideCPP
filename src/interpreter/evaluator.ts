@@ -3,6 +3,12 @@ import {
   getBuiltinFreeFunctionSpec,
   getBuiltinTemplateComparatorSpec,
 } from "@/stdlib/registry";
+import {
+  mapKeyType,
+  mapValueType,
+  tupleElementTypes,
+  vectorElementType,
+} from "@/stdlib/template-types";
 import type { RuntimeLocation, RuntimeValue } from "@/runtime/value";
 import type {
   AssignTargetNode,
@@ -244,7 +250,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
       const parent = this.resolveAssignTargetLocation(targetExpr as AssignTargetNode, line);
       const keyValue = this.ensureNotVoid(
         this.ensureInitialized(
-          this.assertType(targetValue.type.keyType, this.evaluateExpr(indexExpr), line),
+          this.assertType(mapKeyType(targetValue.type), this.evaluateExpr(indexExpr), line),
           line,
           "map key",
         ),
@@ -255,7 +261,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         kind: "map",
         parent,
         entryIndex,
-        type: targetValue.type.valueType,
+        type: mapValueType(targetValue.type),
         access: "value",
       };
     }
@@ -275,7 +281,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
       kind: "array",
       ref: target.ref,
       index: Number(index),
-      type: store.type.elementType,
+      type: isVectorType(store.type) ? vectorElementType(store.type) : store.type.elementType,
     };
   }
 
@@ -292,7 +298,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
     if (tupleValue.kind !== "tuple") {
       this.fail("type mismatch: expected tuple", line);
     }
-    const elementType = tupleValue.type.elementTypes[index];
+    const elementType = tupleElementTypes(tupleValue.type)[index];
     if (elementType === undefined) {
       this.fail(
         `tuple index ${index.toString()} out of range for tuple of size ${tupleValue.values.length}`,
@@ -514,7 +520,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
       }
       const value = this.castToElementType(
         this.evaluateExpr(args[0] as ExprNode),
-        store.type.elementType,
+        vectorElementType(store.type),
         line,
       );
       store.values.push(value);
@@ -578,7 +584,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         store.values = store.values.slice(0, targetSize);
       } else {
         while (store.values.length < targetSize) {
-          store.values.push(this.defaultValueForType(store.type.elementType, line));
+          store.values.push(this.defaultValueForType(vectorElementType(store.type), line));
         }
       }
       return { kind: "void" };
@@ -877,7 +883,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
       }
       const fillValue = this.castToElementType(
         this.evaluateExpr(fillArg),
-        store.type.elementType,
+        vectorElementType(store.type),
         line,
       );
       store.values = store.values.map(() => fillValue);
@@ -983,7 +989,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
 
     const nextEntry = {
       key,
-      value: this.defaultValueForType(mapValue.type.valueType, line),
+      value: this.defaultValueForType(mapValueType(mapValue.type), line),
     };
     mapValue.entries.push(nextEntry);
     mapValue.entries.sort((left, right) =>

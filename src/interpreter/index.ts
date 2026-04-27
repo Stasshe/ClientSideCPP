@@ -1,6 +1,7 @@
 import { BreakSignal, ContinueSignal, ReturnSignal, RuntimeTrap } from "@/runtime/errors";
 import type { RuntimeValue } from "@/runtime/value";
 import { stringifyValue, uninitializedForType } from "@/runtime/value";
+import { mapKeyType, mapValueType, vectorElementType } from "@/stdlib/template-types";
 import type {
   DebugInfo,
   DebugState,
@@ -387,14 +388,15 @@ class Interpreter extends InterpreterEvaluator {
   ): Array<Extract<RuntimeValue, { kind: "reference" }>> {
     const value = this.ensureInitialized(this.evaluateExpr(source), line, "value");
     if (value.kind === "array" && isVectorType(value.type)) {
+      const elementType = vectorElementType(value.type);
       const store = this.arrays.get(value.ref);
       if (store === undefined) {
         this.fail("invalid array reference", line);
       }
       return store.values.map((_entry, index) => ({
         kind: "reference",
-        type: { kind: "ReferenceType", referredType: store.type.elementType },
-        target: { kind: "array", ref: value.ref, index, type: store.type.elementType },
+        type: { kind: "ReferenceType", referredType: elementType },
+        target: { kind: "array", ref: value.ref, index, type: elementType },
       }));
     }
     if (value.kind === "array") {
@@ -402,10 +404,13 @@ class Interpreter extends InterpreterEvaluator {
       if (store === undefined) {
         this.fail("invalid array reference", line);
       }
+      const elementType = isVectorType(store.type)
+        ? vectorElementType(store.type)
+        : store.type.elementType;
       return store.values.map((_entry, index) => ({
         kind: "reference",
-        type: { kind: "ReferenceType", referredType: store.type.elementType },
-        target: { kind: "array", ref: value.ref, index, type: store.type.elementType },
+        type: { kind: "ReferenceType", referredType: elementType },
+        target: { kind: "array", ref: value.ref, index, type: elementType },
       }));
     }
     if (value.kind === "map") {
@@ -421,13 +426,13 @@ class Interpreter extends InterpreterEvaluator {
         kind: "reference",
         type: {
           kind: "ReferenceType",
-          referredType: pairType(value.type.keyType, value.type.valueType),
+          referredType: pairType(mapKeyType(value.type), mapValueType(value.type)),
         },
         target: {
           kind: "map",
           parent,
           entryIndex,
-          type: pairType(value.type.keyType, value.type.valueType),
+          type: pairType(mapKeyType(value.type), mapValueType(value.type)),
           access: "entry",
         },
       }));

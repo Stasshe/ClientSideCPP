@@ -1,4 +1,12 @@
 import { getSupportedTemplateTypeSpec } from "@/stdlib/registry";
+import {
+  mapKeyType,
+  mapValueType,
+  pairFirstType,
+  pairSecondType,
+  tupleElementTypes,
+  vectorElementType,
+} from "@/stdlib/template-types";
 import type {
   ArrayDeclNode,
   PrimitiveTypeNode,
@@ -8,18 +16,18 @@ import type {
 } from "@/types";
 import {
   arrayType,
-  isMapType,
-  isPairType,
-  mapType,
   isPrimitiveType,
-  isVectorType,
-  isTupleType,
+  mapType,
   pairType,
   pointerType,
   primitiveType,
   referenceType,
   tupleType,
   vectorType,
+  isMapType,
+  isPairType,
+  isTupleType,
+  isVectorType,
 } from "@/types";
 import { BaseParserCore } from "./core";
 
@@ -35,36 +43,15 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
   }
 
   protected parseType(): TypeNode | null {
-    const templateTypeName = this.peekSupportedTemplateTypeName();
-    if (templateTypeName !== null) {
-      return this.parseKnownTemplateType(templateTypeName);
+    const templateType = this.parseSupportedTemplateType();
+    if (templateType !== null) {
+      return templateType;
     }
     return this.parsePrimitiveType();
   }
 
   protected parseTypeSpecifier(): TypeNode | null {
     return this.parseType();
-  }
-
-  protected parseVectorType(): VectorDeclNode["type"] | null {
-    if (!this.consumeKeyword("vector", "expected 'vector'")) {
-      return null;
-    }
-    if (!this.consumeSymbol("<", "expected '<' after vector")) {
-      return null;
-    }
-    const elementType = this.parseType();
-    if (elementType === null) {
-      return null;
-    }
-    if (this.isVoidTypeNode(elementType)) {
-      this.errorAtCurrent("vector element type cannot be void");
-      return null;
-    }
-    if (!this.consumeTypeClose("expected '>' after vector element type")) {
-      return null;
-    }
-    return vectorType(elementType);
   }
 
   protected parsePrimitiveType(): PrimitiveTypeNode | null {
@@ -128,16 +115,16 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
       return this.isVoidTypeNode(type.referredType);
     }
     if (isPairType(type)) {
-      return this.isVoidTypeNode(type.firstType) || this.isVoidTypeNode(type.secondType);
+      return this.isVoidTypeNode(pairFirstType(type)) || this.isVoidTypeNode(pairSecondType(type));
     }
     if (isMapType(type)) {
-      return this.isVoidTypeNode(type.keyType) || this.isVoidTypeNode(type.valueType);
+      return this.isVoidTypeNode(mapKeyType(type)) || this.isVoidTypeNode(mapValueType(type));
     }
     if (isTupleType(type)) {
-      return type.elementTypes.some((elementType) => this.isVoidTypeNode(elementType));
+      return tupleElementTypes(type).some((elementType) => this.isVoidTypeNode(elementType));
     }
     if (type.kind === "ArrayType" || isVectorType(type)) {
-      return this.isVoidTypeNode(type.elementType);
+      return this.isVoidTypeNode(type.kind === "ArrayType" ? type.elementType : vectorElementType(type));
     }
     this.errorAtCurrent("unsupported template type in void check");
     return false;
@@ -205,119 +192,97 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
     return null;
   }
 
-  protected parseKnownTemplateType(name: "vector" | "map" | "pair" | "tuple"): TypeNode | null {
-    switch (name) {
-      case "vector":
-        return this.parseVectorType();
-      case "map":
-        return this.parseMapType();
-      case "pair":
-        return this.parsePairType();
+  protected parseVectorType(): VectorDeclNode["type"] | null {
+    const type = this.parseSupportedTemplateType();
+    return type !== null && isVectorType(type) ? type : null;
+  }
+
+  protected parseSupportedTemplateType(): TypeNode | null {
+    const templateTypeName = this.peekSupportedTemplateTypeName();
+    if (templateTypeName === null) {
+      return null;
+    }
+    const spec = getSupportedTemplateTypeSpec(templateTypeName);
+    if (spec === null) {
+      return null;
+    }
+    this.advance();
+    if (!this.consumeSymbol("<", `expected '<' after ${spec.name}`)) {
+      return null;
+    }
+
+    const templateArgs = this.parseTemplateTypeArguments(spec.name);
+    if (templateArgs === null) {
+      return null;
+    }
+
+    if (!this.consumeTypeClose(`expected '>' after ${spec.name} type`)) {
+      return null;
+    }
+
+    if (spec.arity >= 0 && templateArgs.length !== spec.arity) {
+      this.errorAtCurrent(`${spec.name} requires ${spec.arity.toString()} template argument(s)`);
+      return null;
+    }
+
+    switch (spec.name) {
+      case "vector": {
+        const elementType = templateArgs[0];
+        if (elementType === undefined) {
+          return null;
+        }
+        return vectorType(elementType);
+      }
+      case "map": {
+        const keyType = templateArgs[0];
+        const valueType = templateArgs[1];
+        if (keyType === undefined || valueType === undefined) {
+          return null;
+        }
+        return mapType(keyType, valueType);
+      }
+      case "pair": {
+        const firstType = templateArgs[0];
+        const secondType = templateArgs[1];
+        if (firstType === undefined || secondType === undefined) {
+          return null;
+        }
+        return pairType(firstType, secondType);
+      }
       case "tuple":
-        return this.parseTupleType();
+        return tupleType(templateArgs);
     }
   }
 
-  protected parsePairType(): TypeNode | null {
-    if (!this.isTemplateTypeToken("pair")) {
-      this.errorAtCurrent("expected 'pair'");
-      return null;
-    }
-    this.advance();
-    if (!this.consumeSymbol("<", "expected '<' after pair")) {
-      return null;
-    }
-    const firstType = this.parseType();
-    if (firstType === null) {
-      return null;
-    }
-    if (!this.consumeSymbol(",", "expected ',' in pair type")) {
-      return null;
-    }
-    const secondType = this.parseType();
-    if (secondType === null) {
-      return null;
-    }
-    if (this.isVoidTypeNode(firstType) || this.isVoidTypeNode(secondType)) {
-      this.errorAtCurrent("pair element type cannot be void");
-      return null;
-    }
-    if (!this.consumeTypeClose("expected '>' after pair type")) {
-      return null;
-    }
-    return pairType(firstType, secondType);
-  }
+  private parseTemplateTypeArguments(templateName: string): TypeNode[] | null {
+    const templateArgs: TypeNode[] = [];
 
-  protected parseMapType(): TypeNode | null {
-    if (!this.isTemplateTypeToken("map")) {
-      this.errorAtCurrent("expected 'map'");
-      return null;
-    }
-    this.advance();
-    if (!this.consumeSymbol("<", "expected '<' after map")) {
-      return null;
-    }
-    const keyType = this.parseType();
-    if (keyType === null) {
-      return null;
-    }
-    if (!this.consumeSymbol(",", "expected ',' in map type")) {
-      return null;
-    }
-    const valueType = this.parseType();
-    if (valueType === null) {
-      return null;
-    }
-    if (this.isVoidTypeNode(keyType) || this.isVoidTypeNode(valueType)) {
-      this.errorAtCurrent("map key/value type cannot be void");
-      return null;
-    }
-    if (!this.consumeTypeClose("expected '>' after map type")) {
-      return null;
-    }
-    return mapType(keyType, valueType);
-  }
-
-  protected parseTupleType(): TypeNode | null {
-    if (!this.isTemplateTypeToken("tuple")) {
-      this.errorAtCurrent("expected 'tuple'");
-      return null;
-    }
-    this.advance();
-    if (!this.consumeSymbol("<", "expected '<' after tuple")) {
-      return null;
-    }
-
-    const elementTypes: TypeNode[] = [];
     while (true) {
-      const elementType = this.parseType();
-      if (elementType === null) {
+      const templateArg = this.parseType();
+      if (templateArg === null) {
         return null;
       }
-      if (this.isVoidTypeNode(elementType)) {
-        this.errorAtCurrent("tuple element type cannot be void");
+      if (this.isVoidTypeNode(templateArg)) {
+        this.errorAtCurrent(`${templateName} template argument cannot be void`);
         return null;
       }
-      elementTypes.push(elementType);
+      templateArgs.push(templateArg);
 
       this.splitShiftCloseToken();
       if (this.checkSymbol(">")) {
         break;
       }
-      if (!this.consumeSymbol(",", "expected ',' in tuple type")) {
+      if (!this.consumeSymbol(",", `expected ',' in ${templateName} type`)) {
         return null;
       }
     }
 
-    if (elementTypes.length === 0) {
-      this.errorAtCurrent("tuple must have at least one element type");
+    if (templateArgs.length === 0) {
+      this.errorAtCurrent(`${templateName} must have at least one template argument`);
       return null;
     }
 
-    if (!this.consumeTypeClose("expected '>' after tuple type")) {
-      return null;
-    }
-    return tupleType(elementTypes);
+    return templateArgs;
   }
 
   private parseArrayDimensions(

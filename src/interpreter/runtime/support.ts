@@ -1,6 +1,7 @@
 import type { RuntimeLocation, RuntimeValue } from "@/runtime/value";
+import { mapKeyType, mapValueType, vectorElementType } from "@/stdlib/template-types";
 import type { ArrayTypeNode, ExprNode, TypeNode } from "@/types";
-import { isMapType, pairType } from "@/types";
+import { isArrayType, isMapType, pairType } from "@/types";
 import type { Scope } from "./core";
 import { InterpreterRuntimeTypeSupport } from "./type-support";
 
@@ -200,7 +201,8 @@ export abstract class InterpreterRuntimeSupport extends InterpreterRuntimeTypeSu
     }
     const slots: Array<{ assign: (value: RuntimeValue, assignLine: number) => void }> = [];
     for (let i = 0; i < store.values.length; i += 1) {
-      if (store.type.elementType.kind === "ArrayType") {
+      const elementType = isArrayType(store.type) ? store.type.elementType : vectorElementType(store.type);
+      if (elementType.kind === "ArrayType") {
         const nested = store.values[i];
         if (nested !== undefined) {
           slots.push(...this.flattenArrayElements(nested, line));
@@ -209,7 +211,7 @@ export abstract class InterpreterRuntimeSupport extends InterpreterRuntimeTypeSu
       }
       slots.push({
         assign: (value: RuntimeValue, assignLine: number) => {
-          store.values[i] = this.castToElementType(value, store.type.elementType, assignLine);
+          store.values[i] = this.castToElementType(value, elementType, assignLine);
         },
       });
     }
@@ -258,7 +260,7 @@ export abstract class InterpreterRuntimeSupport extends InterpreterRuntimeTypeSu
           return {
             kind: "pair",
             type: isMapType(parent.type)
-              ? pairType(parent.type.keyType, parent.type.valueType)
+              ? pairType(mapKeyType(parent.type), mapValueType(parent.type))
               : (location.type as ReturnType<typeof pairType>),
             first: entry.key,
             second: entry.value.kind === "reference" ? this.readLocation(entry.value.target, line) : entry.value,
@@ -345,8 +347,8 @@ export abstract class InterpreterRuntimeSupport extends InterpreterRuntimeTypeSu
               this.fail("map entry assignment requires pair", line);
             }
             return {
-              key: this.assertType(current.type.keyType, assigned.first, line),
-              value: this.assertType(current.type.valueType, assigned.second, line),
+              key: this.assertType(mapKeyType(current.type), assigned.first, line),
+              value: this.assertType(mapValueType(current.type), assigned.second, line),
             };
           }
           return {

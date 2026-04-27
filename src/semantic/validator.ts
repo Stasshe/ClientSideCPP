@@ -3,6 +3,14 @@ import {
   getBuiltinFreeFunctionSpec,
   getBuiltinTemplateComparatorSpec,
 } from "@/stdlib/registry";
+import {
+  mapKeyType,
+  mapValueType,
+  pairFirstType,
+  pairSecondType,
+  tupleElementTypes,
+  vectorElementType,
+} from "@/stdlib/template-types";
 import type {
   CompileError,
   ExprNode,
@@ -11,6 +19,7 @@ import type {
   RangeForStmtNode,
   StatementNode,
   TypeNode,
+  VectorTypeNode,
 } from "@/types";
 import {
   isArrayType,
@@ -275,14 +284,14 @@ function validateDecl(
       if (containsVoid(stmt.type)) {
         pushError(context, stmt.line, stmt.col, "vector element type cannot be void");
       }
-      if (containsReferenceBelowTopLevel(stmt.type.elementType)) {
+      if (containsReferenceBelowTopLevel(vectorElementType(stmt.type))) {
         pushError(context, stmt.line, stmt.col, "vector element type cannot be reference");
       }
       if (stmt.constructorArgs.length >= 1) {
         validateExpr(stmt.constructorArgs[0] ?? null, context, "int");
       }
       if (stmt.constructorArgs.length >= 2) {
-        validateExpr(stmt.constructorArgs[1] ?? null, context, stmt.type.elementType);
+        validateExpr(stmt.constructorArgs[1] ?? null, context, vectorElementType(stmt.type));
       }
       defineSymbol(stmt.name, stmt.type, stmt.line, stmt.col, context);
       return;
@@ -425,11 +434,11 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
       }
       if (isArrayType(targetType) || isVectorType(targetType)) {
         validateExpr(expr.index, context, "int");
-        return targetType.elementType;
+        return isArrayType(targetType) ? targetType.elementType : vectorElementType(targetType);
       }
       if (isMapType(targetType)) {
-        validateExpr(expr.index, context, targetType.keyType);
-        return targetType.valueType;
+        validateExpr(expr.index, context, mapKeyType(targetType));
+        return mapValueType(targetType);
       }
       pushError(context, expr.line, expr.col, "type mismatch: expected array/vector/map/string");
       return null;
@@ -454,7 +463,7 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
         validateExpr(expr.args[0] ?? null, context, "int");
       }
       if (expr.args.length >= 2) {
-        validateExpr(expr.args[1] ?? null, context, expr.type.elementType);
+        validateExpr(expr.args[1] ?? null, context, vectorElementType(expr.type));
       }
       if (expr.args.length > 2) {
         pushError(context, expr.line, expr.col, "too many arguments for vector constructor");
@@ -546,13 +555,14 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
         pushError(context, expr.line, expr.col, "type mismatch: expected tuple");
         return null;
       }
-      const elementType = tupleType.elementTypes[expr.index];
+      const elementTypes = tupleElementTypes(tupleType);
+      const elementType = elementTypes[expr.index];
       if (elementType === undefined) {
         pushError(
           context,
           expr.line,
           expr.col,
-          `tuple index ${expr.index.toString()} out of range for tuple of size ${tupleType.elementTypes.length}`,
+          `tuple index ${expr.index.toString()} out of range for tuple of size ${elementTypes.length}`,
         );
         return null;
       }
@@ -873,7 +883,7 @@ function validateRangeBuiltin(
   const rangeType = validateVectorRangeArgs(args[0], args[1], builtin.name, context, line, col);
 
   if (builtin.name === "fill") {
-    validateExpr(args[2] ?? null, context, rangeType?.elementType);
+    validateExpr(args[2] ?? null, context, rangeType === null ? undefined : vectorElementType(rangeType));
   } else if (builtin.name === "sort" && args[2] !== undefined) {
     const comparator = args[2];
     if (
@@ -895,7 +905,7 @@ function validateVectorRangeArgs(
   context: ValidationContext,
   line: number,
   col: number,
-): Extract<TypeNode, { kind: "TemplateType"; templateName: "vector" }> | null {
+): VectorTypeNode | null {
   if (
     beginExpr === undefined ||
     endExpr === undefined ||
@@ -958,7 +968,7 @@ function validateMethodCall(
       if (args.length !== 0) {
         pushError(context, line, col, `${method} requires no arguments`);
       }
-      return method === "first" ? receiverType.firstType : receiverType.secondType;
+      return method === "first" ? pairFirstType(receiverType) : pairSecondType(receiverType);
     }
     pushError(context, line, col, "type mismatch: expected array/vector/pair");
     for (const arg of args) {
@@ -978,7 +988,7 @@ function validateMethodCall(
       if (args.length !== 1) {
         pushError(context, line, col, "push_back requires exactly 1 argument");
       }
-      validateExpr(args[0] ?? null, context, receiverType.elementType);
+      validateExpr(args[0] ?? null, context, vectorElementType(receiverType));
       return { kind: "PrimitiveType", name: "void" };
     case "pop_back":
     case "clear":
@@ -995,7 +1005,7 @@ function validateMethodCall(
       if (args.length !== 0) {
         pushError(context, line, col, "back requires no arguments");
       }
-      return receiverType.elementType;
+      return vectorElementType(receiverType);
     case "empty":
       if (args.length !== 0) {
         pushError(context, line, col, "empty requires no arguments");
@@ -1091,15 +1101,15 @@ function resolveConditionalType(
 
   if (isPairType(thenType) && isPairType(elseType)) {
     const firstType = resolveConditionalType(
-      thenType.firstType,
-      elseType.firstType,
+      pairFirstType(thenType),
+      pairFirstType(elseType),
       line,
       col,
       context,
     );
     const secondType = resolveConditionalType(
-      thenType.secondType,
-      elseType.secondType,
+      pairSecondType(thenType),
+      pairSecondType(elseType),
       line,
       col,
       context,
@@ -1111,7 +1121,9 @@ function resolveConditionalType(
   }
 
   if (isTupleType(thenType) && isTupleType(elseType)) {
-    if (thenType.elementTypes.length !== elseType.elementTypes.length) {
+    const thenElements = tupleElementTypes(thenType);
+    const elseElements = tupleElementTypes(elseType);
+    if (thenElements.length !== elseElements.length) {
       pushError(
         context,
         line,
@@ -1121,9 +1133,9 @@ function resolveConditionalType(
       return null;
     }
     const elementTypes: TypeNode[] = [];
-    for (let i = 0; i < thenType.elementTypes.length; i += 1) {
-      const leftElement = thenType.elementTypes[i];
-      const rightElement = elseType.elementTypes[i];
+    for (let i = 0; i < thenElements.length; i += 1) {
+      const leftElement = thenElements[i];
+      const rightElement = elseElements[i];
       if (leftElement === undefined || rightElement === undefined) {
         return null;
       }
@@ -1180,31 +1192,37 @@ function sameType(left: TypeNode, right: TypeNode): boolean {
     return isArrayType(left) && isArrayType(right) && sameType(left.elementType, right.elementType);
   }
   if (isVectorType(left) || isVectorType(right)) {
-    return isVectorType(left) && isVectorType(right) && sameType(left.elementType, right.elementType);
+    return (
+      isVectorType(left) &&
+      isVectorType(right) &&
+      sameType(vectorElementType(left), vectorElementType(right))
+    );
   }
   if (isMapType(left) || isMapType(right)) {
     return (
       isMapType(left) &&
       isMapType(right) &&
-      sameType(left.keyType, right.keyType) &&
-      sameType(left.valueType, right.valueType)
+      sameType(mapKeyType(left), mapKeyType(right)) &&
+      sameType(mapValueType(left), mapValueType(right))
     );
   }
   if (isPairType(left) || isPairType(right)) {
     return (
       isPairType(left) &&
       isPairType(right) &&
-      sameType(left.firstType, right.firstType) &&
-      sameType(left.secondType, right.secondType)
+      sameType(pairFirstType(left), pairFirstType(right)) &&
+      sameType(pairSecondType(left), pairSecondType(right))
     );
   }
   if (isTupleType(left) || isTupleType(right)) {
+    const leftElements = isTupleType(left) ? tupleElementTypes(left) : [];
+    const rightElements = isTupleType(right) ? tupleElementTypes(right) : [];
     return (
       isTupleType(left) &&
       isTupleType(right) &&
-      left.elementTypes.length === right.elementTypes.length &&
-      left.elementTypes.every((elementType, index) => {
-        const rightElementType = right.elementTypes[index];
+      leftElements.length === rightElements.length &&
+      leftElements.every((elementType, index) => {
+        const rightElementType = rightElements[index];
         return rightElementType !== undefined && sameType(elementType, rightElementType);
       })
     );
@@ -1228,21 +1246,23 @@ function isAssignable(source: TypeNode, target: TypeNode): boolean {
   }
   if (isPairType(source) && isPairType(target)) {
     return (
-      isAssignable(source.firstType, target.firstType) &&
-      isAssignable(source.secondType, target.secondType)
+      isAssignable(pairFirstType(source), pairFirstType(target)) &&
+      isAssignable(pairSecondType(source), pairSecondType(target))
     );
   }
   if (isMapType(source) && isMapType(target)) {
     return (
-      isAssignable(source.keyType, target.keyType) &&
-      isAssignable(source.valueType, target.valueType)
+      isAssignable(mapKeyType(source), mapKeyType(target)) &&
+      isAssignable(mapValueType(source), mapValueType(target))
     );
   }
   if (isTupleType(source) && isTupleType(target)) {
+    const sourceElements = tupleElementTypes(source);
+    const targetElements = tupleElementTypes(target);
     return (
-      source.elementTypes.length === target.elementTypes.length &&
-      source.elementTypes.every((elementType, index) => {
-        const targetElementType = target.elementTypes[index];
+      sourceElements.length === targetElements.length &&
+      sourceElements.every((elementType, index) => {
+        const targetElementType = targetElements[index];
         return targetElementType !== undefined && isAssignable(elementType, targetElementType);
       })
     );
@@ -1316,16 +1336,16 @@ function containsVoid(type: TypeNode): boolean {
     return containsVoid(type.referredType);
   }
   if (isPairType(type)) {
-    return containsVoid(type.firstType) || containsVoid(type.secondType);
+    return containsVoid(pairFirstType(type)) || containsVoid(pairSecondType(type));
   }
   if (isMapType(type)) {
-    return containsVoid(type.keyType) || containsVoid(type.valueType);
+    return containsVoid(mapKeyType(type)) || containsVoid(mapValueType(type));
   }
   if (isTupleType(type)) {
-    return type.elementTypes.some((elementType) => containsVoid(elementType));
+    return tupleElementTypes(type).some((elementType) => containsVoid(elementType));
   }
   if (isArrayType(type) || isVectorType(type)) {
-    return containsVoid(type.elementType);
+    return containsVoid(isArrayType(type) ? type.elementType : vectorElementType(type));
   }
   return false;
 }
@@ -1359,16 +1379,22 @@ function containsReferenceNested(type: TypeNode): boolean {
     return containsReferenceNested(type.pointeeType);
   }
   if (isPairType(type)) {
-    return containsReferenceNested(type.firstType) || containsReferenceNested(type.secondType);
+    return (
+      containsReferenceNested(pairFirstType(type)) ||
+      containsReferenceNested(pairSecondType(type))
+    );
   }
   if (isMapType(type)) {
-    return containsReferenceNested(type.keyType) || containsReferenceNested(type.valueType);
+    return (
+      containsReferenceNested(mapKeyType(type)) ||
+      containsReferenceNested(mapValueType(type))
+    );
   }
   if (isTupleType(type)) {
-    return type.elementTypes.some((elementType) => containsReferenceNested(elementType));
+    return tupleElementTypes(type).some((elementType) => containsReferenceNested(elementType));
   }
   if (isArrayType(type) || isVectorType(type)) {
-    return containsReferenceNested(type.elementType);
+    return containsReferenceNested(isArrayType(type) ? type.elementType : vectorElementType(type));
   }
   return false;
 }
@@ -1438,10 +1464,10 @@ function getIterableElementType(
   context: ValidationContext,
 ): TypeNode | null {
   if (isArrayType(sourceType) || isVectorType(sourceType)) {
-    return sourceType.elementType;
+    return isArrayType(sourceType) ? sourceType.elementType : vectorElementType(sourceType);
   }
   if (isMapType(sourceType)) {
-    return pairType(sourceType.keyType, sourceType.valueType);
+    return pairType(mapKeyType(sourceType), mapValueType(sourceType));
   }
   if (isStringType(sourceType)) {
     return { kind: "PrimitiveType", name: "char" };

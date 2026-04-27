@@ -1,5 +1,6 @@
 import { RuntimeTrap } from "@/runtime/errors";
 import type { RuntimeLocation, RuntimeValue } from "@/runtime/value";
+import { vectorElementType } from "@/stdlib/template-types";
 import type {
   ArrayDeclNode,
   AssignTargetNode,
@@ -170,14 +171,14 @@ export abstract class InterpreterRuntimeCore {
         this.fail("vector size must be non-negative", line);
       }
       values = Array.from({ length: Number(size) }, () =>
-        this.defaultValueForType(type.elementType, line),
+        this.defaultValueForType(vectorElementType(type), line),
       );
     } else if (args.length === 2) {
       const size = this.expectInt(args[0] as RuntimeValue, line).value;
       if (size < 0n) {
         this.fail("vector size must be non-negative", line);
       }
-      const fillValue = this.castToElementType(args[1] as RuntimeValue, type.elementType, line);
+      const fillValue = this.castToElementType(args[1] as RuntimeValue, vectorElementType(type), line);
       values = Array.from({ length: Number(size) }, () => fillValue);
     } else if (args.length > 2) {
       this.fail("too many arguments for vector constructor", line);
