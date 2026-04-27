@@ -1,3 +1,4 @@
+import { getMapMethodSpec } from "@/stdlib/map-methods";
 import {
   describeBuiltinArity,
   getBuiltinFreeFunctionSpec,
@@ -15,6 +16,7 @@ import {
   tupleElementTypes,
   vectorElementType,
 } from "@/stdlib/template-types";
+import { describeVectorMethodArgs, getVectorMethodSpec } from "@/stdlib/vector-methods";
 import type {
   CompileError,
   ExprNode,
@@ -25,9 +27,8 @@ import type {
   VectorTypeNode,
 } from "@/types";
 import {
+  isMapType,
   isPairType,
-  isPointerType,
-  isReferenceType,
   isTupleType,
   isVectorType,
   pairType,
@@ -36,8 +37,7 @@ import {
   vectorType,
 } from "@/types";
 import { inferTypeArgs, instantiateFunction, instantiationKey } from "./template-instantiator";
-import { isAssignable, isAssignableExpr, sameType } from "./type-compat";
-import { isIntType, isNumericType } from "./type-utils";
+import { isAssignable, isAssignableExpr } from "./type-compat";
 
 export type ValidationContext = {
   errors: CompileError[];
@@ -283,73 +283,79 @@ export function validateMethodCall(
     }
     return null;
   }
-  if (!isVectorType(receiverType)) {
-    if (isPairType(receiverType)) {
-      if (method !== "first" && method !== "second") {
-        pushError(context, line, col, `unknown pair member '${method}'`);
-        for (const arg of args) {
-          validateExpr(arg, context);
-        }
-        return null;
+
+  if (isPairType(receiverType)) {
+    if (method !== "first" && method !== "second") {
+      pushError(context, line, col, `unknown pair member '${method}'`);
+      for (const arg of args) {
+        validateExpr(arg, context);
       }
-      if (args.length !== 0) {
-        pushError(context, line, col, `${method} requires no arguments`);
-      }
-      return method === "first" ? pairFirstType(receiverType) : pairSecondType(receiverType);
+      return null;
     }
-    pushError(context, line, col, "type mismatch: expected array/vector/pair");
+    if (args.length !== 0) {
+      pushError(context, line, col, `${method} requires no arguments`);
+    }
+    return method === "first" ? pairFirstType(receiverType) : pairSecondType(receiverType);
+  }
+
+  if (isMapType(receiverType)) {
+    const mapSpec = getMapMethodSpec(method);
+    if (mapSpec === null) {
+      pushError(context, line, col, `unknown map method '${method}'`);
+      for (const arg of args) {
+        validateExpr(arg, context);
+      }
+      return null;
+    }
+    if (args.length < mapSpec.minArgs || args.length > mapSpec.maxArgs) {
+      pushError(context, line, col, `${method} requires no arguments`);
+    }
+    return { kind: "PrimitiveType", name: "int" };
+  }
+
+  if (!isVectorType(receiverType)) {
+    pushError(context, line, col, "type mismatch: expected array/vector/pair/map");
     for (const arg of args) {
       validateExpr(arg, context);
     }
     return null;
   }
 
-  switch (method) {
-    case "begin":
-    case "end":
-      if (args.length !== 0) {
-        pushError(context, line, col, `${method} requires no arguments`);
-      }
-      return receiverType;
-    case "push_back":
-      if (args.length !== 1) {
-        pushError(context, line, col, "push_back requires exactly 1 argument");
-      }
-      validateExpr(args[0] ?? null, context, vectorElementType(receiverType));
+  if (method === "begin" || method === "end") {
+    if (args.length !== 0) {
+      pushError(context, line, col, `${method} requires no arguments`);
+    }
+    return receiverType;
+  }
+
+  const vecSpec = getVectorMethodSpec(method);
+  if (vecSpec === null) {
+    pushError(context, line, col, `unknown vector method '${method}'`);
+    for (const arg of args) {
+      validateExpr(arg, context);
+    }
+    return null;
+  }
+
+  if (args.length < vecSpec.minArgs || args.length > vecSpec.maxArgs) {
+    pushError(context, line, col, `${method} requires ${describeVectorMethodArgs(vecSpec)}`);
+  }
+
+  if (method === "push_back") {
+    validateExpr(args[0] ?? null, context, vectorElementType(receiverType));
+  } else if (method === "resize") {
+    validateExpr(args[0] ?? null, context, "int");
+  }
+
+  switch (vecSpec.returns) {
+    case "void":
       return { kind: "PrimitiveType", name: "void" };
-    case "pop_back":
-    case "clear":
-      if (args.length !== 0) {
-        pushError(context, line, col, `${method} requires no arguments`);
-      }
-      return { kind: "PrimitiveType", name: "void" };
-    case "size":
-      if (args.length !== 0) {
-        pushError(context, line, col, "size requires no arguments");
-      }
+    case "int":
       return { kind: "PrimitiveType", name: "int" };
-    case "back":
-      if (args.length !== 0) {
-        pushError(context, line, col, "back requires no arguments`");
-      }
-      return vectorElementType(receiverType);
-    case "empty":
-      if (args.length !== 0) {
-        pushError(context, line, col, "empty requires no arguments");
-      }
+    case "bool":
       return { kind: "PrimitiveType", name: "bool" };
-    case "resize":
-      if (args.length !== 1) {
-        pushError(context, line, col, "resize requires exactly 1 argument");
-      }
-      validateExpr(args[0] ?? null, context, "int");
-      return { kind: "PrimitiveType", name: "void" };
-    default:
-      pushError(context, line, col, `unknown vector method '${method}'`);
-      for (const arg of args) {
-        validateExpr(arg, context);
-      }
-      return null;
+    case "element":
+      return vectorElementType(receiverType);
   }
 }
 

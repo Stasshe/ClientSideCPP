@@ -5,6 +5,7 @@ import {
   sameLocation,
   toNumericOperands,
 } from "@/stdlib/builtins/compare";
+import { getMapMethodSpec } from "@/stdlib/map-methods";
 import {
   describeBuiltinArity,
   getBuiltinFreeFunctionSpec,
@@ -17,12 +18,8 @@ import {
   isTemplateNamed,
   isTupleGetTemplateCall,
 } from "@/stdlib/template-exprs";
-import {
-  mapKeyType,
-  mapValueType,
-  tupleElementTypes,
-  vectorElementType,
-} from "@/stdlib/template-types";
+import { vectorElementType } from "@/stdlib/template-types";
+import { describeVectorMethodArgs, getVectorMethodSpec } from "@/stdlib/vector-methods";
 import type { AssignTargetNode, ExprNode, TemplateCallExprNode, VectorTypeNode } from "@/types";
 import { isVectorType, pairType, tupleType, vectorType } from "@/types";
 
@@ -227,6 +224,7 @@ export function evaluateMethodCall(
   ctx: EvalCtx,
 ): RuntimeValue {
   const receiver = ctx.evaluateExpr(receiverExpr);
+
   if (receiver.kind === "pair") {
     if (method !== "first" && method !== "second") {
       ctx.fail(`unknown pair member '${method}'`, line);
@@ -236,15 +234,18 @@ export function evaluateMethodCall(
     }
     return method === "first" ? receiver.first : receiver.second;
   }
+
   if (receiver.kind === "map") {
-    if (method === "size") {
-      if (args.length !== 0) {
-        ctx.fail("size requires no arguments", line);
-      }
-      return { kind: "int", value: BigInt(receiver.entries.length) };
+    const mapSpec = getMapMethodSpec(method);
+    if (mapSpec === null) {
+      ctx.fail(`unknown map method '${method}'`, line);
     }
-    ctx.fail(`unknown map method '${method}'`, line);
+    if (args.length < mapSpec.minArgs || args.length > mapSpec.maxArgs) {
+      ctx.fail(`${method} requires no arguments`, line);
+    }
+    return { kind: "int", value: BigInt(receiver.entries.length) };
   }
+
   const arrayValue = ctx.expectArray(receiver, line);
   const store = ctx.arrays.get(arrayValue.ref);
   if (store === undefined) {
@@ -255,83 +256,71 @@ export function evaluateMethodCall(
   }
   const vStore = store as { type: import("@/types").VectorTypeNode; values: RuntimeValue[] };
 
-  if (method === "push_back") {
-    if (args.length !== 1) {
-      ctx.fail("push_back requires exactly 1 argument", line);
-    }
-    const value = ctx.castToElementType(
-      ctx.evaluateExpr(args[0] as ExprNode),
-      vectorElementType(vStore.type),
-      line,
-    );
-    vStore.values.push(value);
-    return { kind: "void" };
+  const vecSpec = getVectorMethodSpec(method);
+  if (vecSpec === null) {
+    ctx.fail(`unknown vector method '${method}'`, line);
+  }
+  if (args.length < vecSpec.minArgs || args.length > vecSpec.maxArgs) {
+    ctx.fail(`${method} requires ${describeVectorMethodArgs(vecSpec)}`, line);
   }
 
-  if (method === "pop_back") {
-    if (args.length !== 0) {
-      ctx.fail("pop_back requires no arguments", line);
-    }
-    if (vStore.values.length === 0) {
-      ctx.fail("pop_back on empty vector", line);
-    }
-    vStore.values.pop();
-    return { kind: "void" };
-  }
+  return applyVectorMethod(vecSpec.name, args, vStore, line, ctx);
+}
 
-  if (method === "size") {
-    if (args.length !== 0) {
-      ctx.fail("size requires no arguments", line);
+function applyVectorMethod(
+  method: import("@/stdlib/vector-methods").VectorMethodName,
+  args: ExprNode[],
+  vStore: { type: import("@/types").VectorTypeNode; values: RuntimeValue[] },
+  line: number,
+  ctx: EvalCtx,
+): RuntimeValue {
+  switch (method) {
+    case "push_back": {
+      const value = ctx.castToElementType(
+        ctx.evaluateExpr(args[0] as ExprNode),
+        vectorElementType(vStore.type),
+        line,
+      );
+      vStore.values.push(value);
+      return { kind: "void" };
     }
-    return { kind: "int", value: BigInt(vStore.values.length) };
-  }
-
-  if (method === "back") {
-    if (args.length !== 0) {
-      ctx.fail("back requires no arguments", line);
-    }
-    const last = vStore.values[vStore.values.length - 1];
-    if (last === undefined) {
-      ctx.fail("back on empty vector", line);
-    }
-    return last;
-  }
-
-  if (method === "empty") {
-    if (args.length !== 0) {
-      ctx.fail("empty requires no arguments", line);
-    }
-    return { kind: "bool", value: vStore.values.length === 0 };
-  }
-
-  if (method === "clear") {
-    if (args.length !== 0) {
-      ctx.fail("clear requires no arguments", line);
-    }
-    vStore.values = [];
-    return { kind: "void" };
-  }
-
-  if (method === "resize") {
-    if (args.length !== 1) {
-      ctx.fail("resize requires exactly 1 argument", line);
-    }
-    const newSize: bigint = ctx.expectInt(ctx.evaluateExpr(args[0] as ExprNode), line).value;
-    if (newSize < 0n) {
-      ctx.fail("resize size must be non-negative", line);
-    }
-    const targetSize = Number(newSize);
-    if (targetSize < vStore.values.length) {
-      vStore.values = vStore.values.slice(0, targetSize);
-    } else {
-      while (vStore.values.length < targetSize) {
-        vStore.values.push(ctx.defaultValueForType(vectorElementType(vStore.type), line));
+    case "pop_back": {
+      if (vStore.values.length === 0) {
+        ctx.fail("pop_back on empty vector", line);
       }
+      vStore.values.pop();
+      return { kind: "void" };
     }
-    return { kind: "void" };
+    case "size":
+      return { kind: "int", value: BigInt(vStore.values.length) };
+    case "back": {
+      const last = vStore.values[vStore.values.length - 1];
+      if (last === undefined) {
+        ctx.fail("back on empty vector", line);
+      }
+      return last;
+    }
+    case "empty":
+      return { kind: "bool", value: vStore.values.length === 0 };
+    case "clear":
+      vStore.values = [];
+      return { kind: "void" };
+    case "resize": {
+      const newSize: bigint = ctx.expectInt(ctx.evaluateExpr(args[0] as ExprNode), line).value;
+      if (newSize < 0n) {
+        ctx.fail("resize size must be non-negative", line);
+      }
+      const targetSize = Number(newSize);
+      if (targetSize < vStore.values.length) {
+        vStore.values = vStore.values.slice(0, targetSize);
+      } else {
+        while (vStore.values.length < targetSize) {
+          vStore.values.push(ctx.defaultValueForType(vectorElementType(vStore.type), line));
+        }
+      }
+      return { kind: "void" };
+    }
   }
-
-  ctx.fail(`unknown vector method '${method}'`, line);
 }
 
 function applyRangeBuiltin(

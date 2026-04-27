@@ -306,4 +306,53 @@ int main() {
     }
     expect(result.errors[0]?.message).toMatch(/make_tuple requires at least 1 argument/);
   });
+
+  it("supports map.size()", () => {
+    const source = `
+#include<iostream>
+using namespace std;
+int main() {
+  map<int, int> m;
+  m[1] = 10;
+  m[2] = 20;
+  cout << m.size() << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("2\n");
+  });
+
+  it("rejects unknown map method", () => {
+    const source = `
+int main() {
+  map<int, int> m;
+  m.push_back(1);
+  return 0;
+}
+`;
+    const result = compile(source);
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("expected compile error");
+    }
+    expect(result.errors[0]?.message).toMatch(/unknown map method/);
+  });
+
+  it("rejects unknown vector method", () => {
+    const source = `
+int main() {
+  vector<int> v;
+  v.front();
+  return 0;
+}
+`;
+    const result = compile(source);
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("expected compile error");
+    }
+    expect(result.errors[0]?.message).toMatch(/unknown vector method/);
+  });
 });
