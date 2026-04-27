@@ -17,7 +17,8 @@ type MacroDefinition = ObjectMacro | FunctionMacro;
 
 type PreprocessResult = { ok: true; source: string } | { ok: false; errors: CompileError[] };
 
-const INCLUDE_PATTERN = /^\s*#\s*include\s*<bits\/stdc\+\+\.h>\s*$/;
+const INCLUDE_PATTERN =
+  /^\s*#\s*include\s*<(bits\/stdc\+\+\.h|iostream|vector|map)>\s*$/;
 const DEFINE_PATTERN = /^\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)(\(([^)]*)\))?\s*(.*)$/;
 const USING_ALIAS_PATTERN = /^\s*using\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;\s*$/;
 const CONST_DECL_PATTERN =
@@ -36,7 +37,7 @@ export function preprocess(source: string): PreprocessResult {
 
     if (!trimmed.startsWith("#")) {
       const expanded = expandLine(line, macros, lineNo, errors);
-      const normalized = normalizeCompatibilitySyntax(expanded);
+      const normalized = normalizeCinCommaStatement(normalizeCompatibilitySyntax(expanded));
       const usingAlias = normalized.match(USING_ALIAS_PATTERN);
       if (usingAlias !== null) {
         const name = usingAlias[1];
@@ -215,6 +216,7 @@ function normalizeCompatibilitySyntax(line: string): string {
   result = result.replace(/\bios_base::/g, "");
   result = result.replace(/\bios::/g, "");
   result = result.replace(/\bsigned\s+main\s*\(/, "int main(");
+  result = result.replace(/\bgreater\s*<\s*>\s*\(\s*\)/g, "greater<int>()");
   result = result.replace(/(\b[A-Za-z_][A-Za-z0-9_]*\b)\s*>>=\s*([^;]+);/g, "$1 = $1 >> ($2);");
   result = result.replace(/(\b[A-Za-z_][A-Za-z0-9_]*\b)\s*<<=\s*([^;]+);/g, "$1 = $1 << ($2);");
   result = normalizeScientificIntegerLiterals(result);
@@ -225,6 +227,84 @@ function normalizeCompatibilitySyntax(line: string): string {
 
 function stripConstKeyword(line: string): string {
   return line.replace(/^\s*const\s+(?=(int|long\s+long|double|bool|char|string|vector)\b)/, "");
+}
+
+function normalizeCinCommaStatement(line: string): string {
+  const cinIndex = line.search(/\bcin\b/);
+  if (cinIndex < 0 || !line.slice(cinIndex).includes(">>")) {
+    return line;
+  }
+
+  let depth = 0;
+  let inString = false;
+  let inChar = false;
+  let escaped = false;
+  for (let index = cinIndex; index < line.length; index += 1) {
+    const ch = line[index] ?? "";
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (!inChar && ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString && ch === "'") {
+      inChar = !inChar;
+      continue;
+    }
+    if (inString || inChar) {
+      continue;
+    }
+    if (ch === "(" || ch === "[" || ch === "{") {
+      depth += 1;
+      continue;
+    }
+    if (ch === ")" || ch === "]" || ch === "}") {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    if (depth === 0 && ch === ",") {
+      const forBodyStart = findForBodyStart(line, cinIndex);
+      if (forBodyStart !== null) {
+        return `${line.slice(0, forBodyStart)}{${line.slice(forBodyStart, index)};${line.slice(index + 1)}}`;
+      }
+      return `${line.slice(0, index)};${line.slice(index + 1)}`;
+    }
+  }
+  return line;
+}
+
+function findForBodyStart(line: string, cinIndex: number): number | null {
+  const forIndex = line.search(/\bfor\s*\(/);
+  if (forIndex < 0 || forIndex > cinIndex) {
+    return null;
+  }
+
+  let depth = 0;
+  for (let index = forIndex; index < line.length; index += 1) {
+    const ch = line[index] ?? "";
+    if (ch === "(") {
+      depth += 1;
+      continue;
+    }
+    if (ch === ")") {
+      depth -= 1;
+      if (depth === 0) {
+        let bodyStart = index + 1;
+        while ((line[bodyStart] ?? "").match(/\s/)) {
+          bodyStart += 1;
+        }
+        return line[bodyStart] === "{" ? null : bodyStart;
+      }
+    }
+  }
+
+  return null;
 }
 
 function normalizeScientificIntegerLiterals(line: string): string {

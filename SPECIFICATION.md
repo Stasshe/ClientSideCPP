@@ -19,10 +19,10 @@
 |---|---|
 | 動的メモリ（`malloc`, `new`, `free`, `delete`） | |
 | 構造体・クラス（`struct`, `class`） | |
-| テンプレート（`template<>`） | ユーザー定義テンプレート・汎用テンプレート機構は非対応。`vector<T>`、`pair<T,U>`、`tuple<T...>`、`make_pair`、`make_tuple`、`get<I>`、`greater<int>()` など一部の標準ライブラリ記法のみ組み込みとして特別対応 |
+| テンプレート（`template<>`） | ユーザー定義テンプレート・汎用テンプレート機構は非対応。`vector<T>`、`map<K,V>`、`pair<T,U>`、`tuple<T...>`、`make_pair`、`make_tuple`、`get<I>`、`greater<int>()` / `greater<>()` など一部の標準ライブラリ記法のみ組み込みとして特別対応 |
 | 関数ポインタ | |
 | 名前空間（`namespace`） | `using namespace std;` のみ特別扱いで許可 |
-| プリプロセッサ | `#include <bits/stdc++.h>` と `#define` のみ対応 |
+| プリプロセッサ | `#include <bits/stdc++.h>`、`#include <iostream>`、`#include <vector>`、`#include <map>`、`#define` に対応 |
 | C / C++ キャスト構文（`(int)x`, `static_cast<>` 等） | |
 | 参照戻り値 | 参照変数・参照引数・range-for 束縛のみ対応 |
 

@@ -400,17 +400,22 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
       return unwrapReference(resolveSymbol(expr.name, expr.line, expr.col, context));
     case "IndexExpr": {
       const targetType = inferExprType(expr.target, context);
-      validateExpr(expr.index, context, "int");
       if (targetType === null) {
         return null;
       }
       if (isStringType(targetType)) {
+        validateExpr(expr.index, context, "int");
         return { kind: "PrimitiveType", name: "char" };
       }
       if (targetType.kind === "ArrayType" || targetType.kind === "VectorType") {
+        validateExpr(expr.index, context, "int");
         return targetType.elementType;
       }
-      pushError(context, expr.line, expr.col, "type mismatch: expected array/vector/string");
+      if (targetType.kind === "MapType") {
+        validateExpr(expr.index, context, targetType.keyType);
+        return targetType.valueType;
+      }
+      pushError(context, expr.line, expr.col, "type mismatch: expected array/vector/map/string");
       return null;
     }
     case "AddressOfExpr": {
@@ -436,12 +441,7 @@ function inferExprType(expr: ExprNode, context: ValidationContext): TypeNode | n
         validateExpr(expr.args[1] ?? null, context, expr.type.elementType);
       }
       if (expr.args.length > 2) {
-        pushError(
-          context,
-          expr.line,
-          expr.col,
-          "too many arguments for vector constructor",
-        );
+        pushError(context, expr.line, expr.col, "too many arguments for vector constructor");
       }
       return expr.type;
     }
@@ -1142,6 +1142,11 @@ function sameType(left: TypeNode, right: TypeNode): boolean {
         left.elementType,
         (right as Extract<TypeNode, { kind: "VectorType" }>).elementType,
       );
+    case "MapType":
+      return (
+        sameType(left.keyType, (right as Extract<TypeNode, { kind: "MapType" }>).keyType) &&
+        sameType(left.valueType, (right as Extract<TypeNode, { kind: "MapType" }>).valueType)
+      );
     case "PairType":
       return (
         sameType(left.firstType, (right as Extract<TypeNode, { kind: "PairType" }>).firstType) &&
@@ -1178,6 +1183,12 @@ function isAssignable(source: TypeNode, target: TypeNode): boolean {
     return (
       isAssignable(source.firstType, target.firstType) &&
       isAssignable(source.secondType, target.secondType)
+    );
+  }
+  if (source.kind === "MapType" && target.kind === "MapType") {
+    return (
+      isAssignable(source.keyType, target.keyType) &&
+      isAssignable(source.valueType, target.valueType)
     );
   }
   if (source.kind === "TupleType" && target.kind === "TupleType") {
@@ -1260,6 +1271,9 @@ function containsVoid(type: TypeNode): boolean {
   if (type.kind === "PairType") {
     return containsVoid(type.firstType) || containsVoid(type.secondType);
   }
+  if (type.kind === "MapType") {
+    return containsVoid(type.keyType) || containsVoid(type.valueType);
+  }
   if (type.kind === "TupleType") {
     return type.elementTypes.some((elementType) => containsVoid(elementType));
   }
@@ -1296,6 +1310,9 @@ function containsReferenceNested(type: TypeNode): boolean {
   }
   if (type.kind === "PairType") {
     return containsReferenceNested(type.firstType) || containsReferenceNested(type.secondType);
+  }
+  if (type.kind === "MapType") {
+    return containsReferenceNested(type.keyType) || containsReferenceNested(type.valueType);
   }
   if (type.kind === "TupleType") {
     return type.elementTypes.some((elementType) => containsReferenceNested(elementType));
@@ -1373,10 +1390,17 @@ function getIterableElementType(
   if (sourceType.kind === "ArrayType" || sourceType.kind === "VectorType") {
     return sourceType.elementType;
   }
+  if (sourceType.kind === "MapType") {
+    return {
+      kind: "PairType",
+      firstType: sourceType.keyType,
+      secondType: sourceType.valueType,
+    };
+  }
   if (isStringType(sourceType)) {
     return { kind: "PrimitiveType", name: "char" };
   }
-  pushError(context, line, col, "range-based for requires array, vector, or string");
+  pushError(context, line, col, "range-based for requires array, vector, map, or string");
   return null;
 }
 

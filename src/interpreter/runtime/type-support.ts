@@ -32,6 +32,13 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
     if (type.kind === "VectorType") {
       return this.allocateArray(type, []);
     }
+    if (type.kind === "MapType") {
+      return {
+        kind: "map",
+        type,
+        entries: [],
+      };
+    }
     if (type.kind === "PairType") {
       return {
         kind: "pair",
@@ -112,6 +119,23 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
       };
     }
 
+    if (type.kind === "MapType") {
+      if (value.kind === "uninitialized") {
+        return { kind: "uninitialized", expectedType: type };
+      }
+      if (value.kind !== "map") {
+        this.fail(`cannot convert '${value.kind}' to '${this.typeKindName(type)}'`, line);
+      }
+      return {
+        kind: "map",
+        type,
+        entries: value.entries.map((entry) => ({
+          key: this.assertType(type.keyType, entry.key, line),
+          value: this.assertType(type.valueType, entry.value, line),
+        })),
+      };
+    }
+
     if (type.kind === "TupleType") {
       if (value.kind === "uninitialized") {
         return { kind: "uninitialized", expectedType: type };
@@ -168,6 +192,8 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
         return "array";
       case "VectorType":
         return "vector";
+      case "MapType":
+        return "map";
       case "PairType":
         return "pair";
       case "TupleType":
@@ -212,6 +238,10 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
         return `<uninitialized:${typeToString(value.expectedType)}>`;
       case "pair":
         return `(${this.serializeValue(value.first)}, ${this.serializeValue(value.second)})`;
+      case "map":
+        return `{${value.entries
+          .map((entry) => `${this.serializeValue(entry.key)}: ${this.serializeValue(entry.value)}`)
+          .join(", ")}}`;
       case "tuple":
         return `(${value.values.map((element) => this.serializeValue(element)).join(", ")})`;
       case "bool":
@@ -280,6 +310,12 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
         return right.kind === "ArrayType" && this.sameType(left.elementType, right.elementType);
       case "VectorType":
         return right.kind === "VectorType" && this.sameType(left.elementType, right.elementType);
+      case "MapType":
+        return (
+          right.kind === "MapType" &&
+          this.sameType(left.keyType, right.keyType) &&
+          this.sameType(left.valueType, right.valueType)
+        );
       case "PointerType":
         return right.kind === "PointerType" && this.sameType(left.pointeeType, right.pointeeType);
       case "PairType":

@@ -14,7 +14,6 @@ import { BaseParserTypeSupport } from "./type-support";
 const UNSUPPORTED_TEMPLATE_TYPES = new Set<string>([
   "unordered_map",
   "priority_queue",
-  "map",
   "set",
   "unordered_set",
 ]);

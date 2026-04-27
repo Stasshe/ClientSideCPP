@@ -1,4 +1,5 @@
 import type {
+  MapTypeNode,
   PairTypeNode,
   PrimitiveTypeNode,
   ReferenceTypeNode,
@@ -10,6 +11,13 @@ import type {
 export type RuntimeLocation =
   | { kind: "binding"; scope: Map<string, RuntimeValue>; name: string; type: TypeNode }
   | { kind: "array"; ref: number; index: number; type: TypeNode }
+  | {
+      kind: "map";
+      parent: RuntimeLocation;
+      entryIndex: number;
+      type: TypeNode;
+      access: "entry" | "value";
+    }
   | { kind: "tuple"; parent: RuntimeLocation; index: number; type: TypeNode }
   | { kind: "string"; parent: RuntimeLocation; index: number };
 
@@ -19,6 +27,7 @@ export type RuntimeValue =
   | { kind: "bool"; value: boolean }
   | { kind: "char"; value: string }
   | { kind: "string"; value: string }
+  | { kind: "map"; type: MapTypeNode; entries: Array<{ key: RuntimeValue; value: RuntimeValue }> }
   | { kind: "pair"; type: PairTypeNode; first: RuntimeValue; second: RuntimeValue }
   | { kind: "tuple"; type: TupleTypeNode; values: RuntimeValue[] }
   | { kind: "array"; ref: number; type: VectorTypeNode | Exclude<TypeNode, PrimitiveTypeNode> }
@@ -65,6 +74,10 @@ export function stringifyValue(value: RuntimeValue): string {
       return value.value;
     case "pair":
       return `(${stringifyValue(value.first)}, ${stringifyValue(value.second)})`;
+    case "map":
+      return `{${value.entries
+        .map((entry) => `${stringifyValue(entry.key)}: ${stringifyValue(entry.value)}`)
+        .join(", ")}}`;
     case "tuple":
       return `(${value.values.map((element) => stringifyValue(element)).join(", ")})`;
     case "void":

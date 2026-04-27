@@ -1,5 +1,13 @@
 # 開発ガイドライン
 
+## 実装優先ディレクティブ
+
+- `SPECIFICATION.md` だけを見て広く薄く実装しない。実装順序と必達条件は `IMPLEMENTATION_DIRECTIVES.md` を優先して従う
+- 新機能を入れるときは、まず `IMPLEMENTATION_DIRECTIVES.md` にあるゴールデンプログラムを確認する
+- ゴールデンプログラムに必要な機能は、parser / semantic / runtime / debugger / tests / docs を同一変更で揃える
+- 競プロ頻出の断片は、一般化が重くても `vector` / `pair` と同じく組み込み機能として先に実装してよい
+- 実装対象が広すぎる場合は、`SPECIFICATION.md` を増やす前に `IMPLEMENTATION_DIRECTIVES.md` の受け入れ条件を具体化する
+
 ## ディレクトリ構造
 
 ```

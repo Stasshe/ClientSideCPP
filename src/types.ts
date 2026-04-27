@@ -22,6 +22,12 @@ export type VectorTypeNode = {
   elementType: TypeNode;
 };
 
+export type MapTypeNode = {
+  kind: "MapType";
+  keyType: TypeNode;
+  valueType: TypeNode;
+};
+
 export type PairTypeNode = {
   kind: "PairType";
   firstType: TypeNode;
@@ -47,6 +53,7 @@ export type TypeNode =
   | PrimitiveTypeNode
   | ArrayTypeNode
   | VectorTypeNode
+  | MapTypeNode
   | PairTypeNode
   | TupleTypeNode
   | PointerTypeNode
@@ -367,6 +374,7 @@ export type DebugValueView = {
     | "bool"
     | "char"
     | "string"
+    | "map"
     | "pair"
     | "tuple"
     | "array"
@@ -461,6 +469,10 @@ export function vectorType(elementType: TypeNode): VectorTypeNode {
   return { kind: "VectorType", elementType };
 }
 
+export function mapType(keyType: TypeNode, valueType: TypeNode): MapTypeNode {
+  return { kind: "MapType", keyType, valueType };
+}
+
 export function pairType(firstType: TypeNode, secondType: TypeNode): PairTypeNode {
   return { kind: "PairType", firstType, secondType };
 }
@@ -489,6 +501,10 @@ export function isVectorType(type: TypeNode): type is VectorTypeNode {
   return type.kind === "VectorType";
 }
 
+export function isMapType(type: TypeNode): type is MapTypeNode {
+  return type.kind === "MapType";
+}
+
 export function isPairType(type: TypeNode): type is PairTypeNode {
   return type.kind === "PairType";
 }
@@ -513,6 +529,8 @@ export function typeToString(type: TypeNode): string {
       return `${typeToString(type.elementType)}[]`;
     case "VectorType":
       return `vector<${typeToString(type.elementType)}>`;
+    case "MapType":
+      return `map<${typeToString(type.keyType)}, ${typeToString(type.valueType)}>`;
     case "PairType":
       return `pair<${typeToString(type.firstType)}, ${typeToString(type.secondType)}>`;
     case "TupleType":

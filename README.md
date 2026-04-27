@@ -123,7 +123,7 @@ A precise specification lives in [`SPECIFICATION.md`](./SPECIFICATION.md).
 Briefly:
 
 - **Types** — `int` / `long long` (both 64-bit `BigInt` internally), `double`,
-  `bool`, `string`, fixed-length arrays, `vector<T>`, `pair<T,U>`,
+  `bool`, `string`, fixed-length arrays, `vector<T>`, `map<K,V>`, `pair<T,U>`,
   `tuple<T...>`, `T*`, `T&`.
 - **Control flow** — `if`/`else`, `for`, range-based `for`, `while`,
   `break`, `continue`, `return`.
@@ -132,9 +132,10 @@ Briefly:
 - **I/O** — `cin`, `cout`, `cerr`, `endl`. Common `sync_with_stdio` /
   `tie` incantations are accepted as no-ops.
 - **Standard library** — `abs`, `max`, `min`, `swap`, `sort` (with
-  `greater<int>()`), `reverse`, `fill`, `make_pair`, `make_tuple`,
-  `get<I>`.
-- **Preprocessor** — `#include <bits/stdc++.h>` and `#define` only.
+  `greater<int>()` or `greater<>()`), `reverse`, `fill`, `make_pair`,
+  `make_tuple`, `get<I>`.
+- **Preprocessor** — `#include <bits/stdc++.h>`, `#include <iostream>`,
+  `#include <vector>`, `#include <map>`, and `#define`.
 
 ### Non-goals
 

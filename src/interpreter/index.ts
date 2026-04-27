@@ -396,6 +396,38 @@ class Interpreter extends InterpreterEvaluator {
         target: { kind: "array", ref: value.ref, index, type: store.type.elementType },
       }));
     }
+    if (value.kind === "map") {
+      if (
+        source.kind !== "Identifier" &&
+        source.kind !== "IndexExpr" &&
+        source.kind !== "DerefExpr"
+      ) {
+        this.fail("range-based for over map requires an assignable source", line);
+      }
+      const parent = this.resolveAssignTargetLocation(source, line);
+      return value.entries.map((_entry, entryIndex) => ({
+        kind: "reference",
+        type: {
+          kind: "ReferenceType",
+          referredType: {
+            kind: "PairType",
+            firstType: value.type.keyType,
+            secondType: value.type.valueType,
+          },
+        },
+        target: {
+          kind: "map",
+          parent,
+          entryIndex,
+          type: {
+            kind: "PairType",
+            firstType: value.type.keyType,
+            secondType: value.type.valueType,
+          },
+          access: "entry",
+        },
+      }));
+    }
     if (value.kind === "string") {
       if (
         source.kind !== "Identifier" &&
@@ -411,7 +443,7 @@ class Interpreter extends InterpreterEvaluator {
         target: { kind: "string", parent, index },
       }));
     }
-    this.fail("range-based for requires array, vector, or string", line);
+    this.fail("range-based for requires array, vector, map, or string", line);
   }
 
   private defaultValueForDeclaredType(

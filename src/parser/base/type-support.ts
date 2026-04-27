@@ -1,6 +1,13 @@
-import type { ArrayDeclNode, PrimitiveTypeNode, Token, TypeNode, VectorDeclNode } from "@/types";
+import type {
+  ArrayDeclNode,
+  PrimitiveTypeNode,
+  Token,
+  TypeNode,
+  VectorDeclNode,
+} from "@/types";
 import {
   arrayType,
+  mapType,
   isPrimitiveType,
   pairType,
   pointerType,
@@ -17,6 +24,9 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
   protected parseType(): TypeNode | null {
     if (this.checkKeyword("vector")) {
       return this.parseVectorType();
+    }
+    if (this.isMapTypeStart()) {
+      return this.parseMapType();
     }
     if (this.isPairTypeStart()) {
       return this.parsePairType();
@@ -91,6 +101,7 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
     return (
       this.peekPrimitiveTypeKeyword() ||
       this.checkKeyword("vector") ||
+      this.isMapTypeStart() ||
       this.isPairTypeStart() ||
       this.isTupleTypeStart()
     );
@@ -116,6 +127,9 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
     }
     if (type.kind === "PairType") {
       return this.isVoidTypeNode(type.firstType) || this.isVoidTypeNode(type.secondType);
+    }
+    if (type.kind === "MapType") {
+      return this.isVoidTypeNode(type.keyType) || this.isVoidTypeNode(type.valueType);
     }
     if (type.kind === "TupleType") {
       return type.elementTypes.some((elementType) => this.isVoidTypeNode(elementType));
@@ -179,6 +193,17 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
     );
   }
 
+  protected isMapTypeStart(): boolean {
+    const token = this.peek();
+    const next = this.tokens[this.index + 1];
+    return (
+      token.kind === "identifier" &&
+      token.text === "map" &&
+      next?.kind === "symbol" &&
+      next.text === "<"
+    );
+  }
+
   protected isTupleTypeStart(): boolean {
     const token = this.peek();
     const next = this.tokens[this.index + 1];
@@ -218,6 +243,36 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
       return null;
     }
     return pairType(firstType, secondType);
+  }
+
+  protected parseMapType(): TypeNode | null {
+    if (!(this.peek().kind === "identifier" && this.peek().text === "map")) {
+      this.errorAtCurrent("expected 'map'");
+      return null;
+    }
+    this.advance();
+    if (!this.consumeSymbol("<", "expected '<' after map")) {
+      return null;
+    }
+    const keyType = this.parseType();
+    if (keyType === null) {
+      return null;
+    }
+    if (!this.consumeSymbol(",", "expected ',' in map type")) {
+      return null;
+    }
+    const valueType = this.parseType();
+    if (valueType === null) {
+      return null;
+    }
+    if (this.isVoidTypeNode(keyType) || this.isVoidTypeNode(valueType)) {
+      this.errorAtCurrent("map key/value type cannot be void");
+      return null;
+    }
+    if (!this.consumeTypeClose("expected '>' after map type")) {
+      return null;
+    }
+    return mapType(keyType, valueType);
   }
 
   protected parseTupleType(): TypeNode | null {

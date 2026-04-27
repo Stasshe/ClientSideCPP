@@ -3,6 +3,8 @@
 ├── README.md
 ├── SPECIFICATION.md
 ├── TODO.md
+├── ai-docs
+│   └── IMPLEMENTATION_DIRECTIVES.md
 ├── apps
 │   └── web
 │       ├── next-env.d.ts
@@ -83,12 +85,12 @@
 ├── tsconfig.json
 └── vitest.config.ts
 
-18 directories, 66 files
+19 directories, 67 files
 
 src/*.ts, *.tsx の統計:
-合計行数: 7638
-合計文字数: 221949
-合計ファイルサイズ(bytes): 221949
+合計行数: 8063
+合計文字数: 234650
+合計ファイルサイズ(bytes): 234650
 
 開発環境の容量:
 1.3G	.

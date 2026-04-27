@@ -95,3 +95,44 @@ describe("Sample Programs - Connected Components", () => {
     expect(result.output.stdout).toBe("1\n4\n");
   });
 });
+
+const mapAggregationSample = `
+#include<iostream>
+#include<vector>
+#include<map>
+using ll = long long;
+using namespace std;
+void solve()
+{
+    int n,k;cin>>n>>k;
+    vector<int>a(n+1);
+    map<int,ll>q;
+    for(int i=1;i<=n;i++)cin>>a[i],q[a[i]]+=a[i];
+    vector<ll>b;
+    for(auto x:q)b.push_back(x.second);
+    sort(b.begin(),b.end(),greater<>());
+    ll ans=0;
+    for(int i=k;i<b.size();i++)ans+=b[i];
+    cout<<ans<<'\\n';
+}
+int main()
+{
+    int t=1;
+    while(t--)solve();
+    return 0;
+}
+`;
+
+describe("Sample Programs - Map Aggregation", () => {
+  it("keeps top k grouped sums and adds the rest", () => {
+    const result = compileAndRun(mapAggregationSample, "8 2\n1 1 2 2 2 3 4 4");
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("5\n");
+  });
+
+  it("handles single retained group", () => {
+    const result = compileAndRun(mapAggregationSample, "5 1\n7 7 7 1 1");
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("2\n");
+  });
+});

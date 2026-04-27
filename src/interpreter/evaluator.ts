@@ -207,8 +207,8 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
     line: number,
   ): RuntimeLocation {
     const targetValue = this.ensureInitialized(this.evaluateExpr(targetExpr), line, "value");
-    const index = this.expectInt(this.evaluateExpr(indexExpr), line).value;
     if (targetValue.kind === "string") {
+      const index = this.expectInt(this.evaluateExpr(indexExpr), line).value;
       if (
         targetExpr.kind !== "Identifier" &&
         targetExpr.kind !== "IndexExpr" &&
@@ -222,6 +222,33 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         index: Number(index),
       };
     }
+    if (targetValue.kind === "map") {
+      if (
+        targetExpr.kind !== "Identifier" &&
+        targetExpr.kind !== "IndexExpr" &&
+        targetExpr.kind !== "DerefExpr"
+      ) {
+        this.fail("map index target must be assignable", line);
+      }
+      const parent = this.resolveAssignTargetLocation(targetExpr as AssignTargetNode, line);
+      const keyValue = this.ensureNotVoid(
+        this.ensureInitialized(
+          this.assertType(targetValue.type.keyType, this.evaluateExpr(indexExpr), line),
+          line,
+          "map key",
+        ),
+        line,
+      );
+      const entryIndex = this.findOrInsertMapEntry(targetValue, keyValue, line);
+      return {
+        kind: "map",
+        parent,
+        entryIndex,
+        type: targetValue.type.valueType,
+        access: "value",
+      };
+    }
+    const index = this.expectInt(this.evaluateExpr(indexExpr), line).value;
     const target = this.expectArray(targetValue, line);
     const store = this.arrays.get(target.ref);
     if (store === undefined) {
@@ -430,6 +457,15 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
         this.fail(`${method} requires no arguments`, line);
       }
       return method === "first" ? receiver.first : receiver.second;
+    }
+    if (receiver.kind === "map") {
+      if (method === "size") {
+        if (args.length !== 0) {
+          this.fail("size requires no arguments", line);
+        }
+        return { kind: "int", value: BigInt(receiver.entries.length) };
+      }
+      this.fail(`unknown map method '${method}'`, line);
     }
     const arrayValue = this.expectArray(receiver, line);
     const store = this.arrays.get(arrayValue.ref);
@@ -890,6 +926,56 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
     }
     this.fail("unsupported sort comparator", line);
   }
+
+  private findOrInsertMapEntry(
+    mapValue: Extract<RuntimeValue, { kind: "map" }>,
+    key: Exclude<RuntimeValue, { kind: "void" | "uninitialized" }>,
+    line: number,
+  ): number {
+    const existingIndex = mapValue.entries.findIndex((entry) =>
+      compareValues(
+        this.ensureComparableMapKey(entry.key, line),
+        key,
+        "==",
+        line,
+        this.fail.bind(this),
+      ),
+    );
+    if (existingIndex >= 0) {
+      return existingIndex;
+    }
+
+    const nextEntry = {
+      key,
+      value: this.defaultValueForType(mapValue.type.valueType, line),
+    };
+    mapValue.entries.push(nextEntry);
+    mapValue.entries.sort((left, right) =>
+      compareSortableValues(
+        this.ensureComparableMapKey(left.key, line),
+        this.ensureComparableMapKey(right.key, line),
+        false,
+        line,
+        this.fail.bind(this),
+      ),
+    );
+    return mapValue.entries.findIndex((entry) =>
+      compareValues(
+        this.ensureComparableMapKey(entry.key, line),
+        key,
+        "==",
+        line,
+        this.fail.bind(this),
+      ),
+    );
+  }
+
+  private ensureComparableMapKey(
+    value: RuntimeValue,
+    line: number,
+  ): Exclude<RuntimeValue, { kind: "void" | "uninitialized" }> {
+    return this.ensureNotVoid(this.ensureInitialized(value, line, "map key"), line);
+  }
 }
 
 function compareValues(
@@ -947,6 +1033,8 @@ function compareValues(
       );
     case "array":
       return fail("array comparison is not supported", line);
+    case "map":
+      return fail("map comparison is not supported", line);
     case "pair":
       return fail("pair comparison is not supported", line);
     case "tuple":
@@ -954,6 +1042,7 @@ function compareValues(
     case "reference":
       return fail("reference comparison is not supported", line);
   }
+  return fail("unsupported comparison", line);
 }
 
 function isNumericRuntimeValue(
@@ -1054,7 +1143,15 @@ function sameLocation(left: RuntimeLocation | null, right: RuntimeLocation | nul
         left.index === right.index &&
         sameLocation(left.parent, right.parent)
       );
+    case "map":
+      return (
+        right.kind === "map" &&
+        left.entryIndex === right.entryIndex &&
+        left.access === right.access &&
+        sameLocation(left.parent, right.parent)
+      );
   }
+  return false;
 }
 
 function sameReceiver(left: ExprNode, right: ExprNode): boolean {
