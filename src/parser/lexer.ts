@@ -14,6 +14,8 @@ const KEYWORDS = new Set<string>([
   "vector",
   "using",
   "namespace",
+  "template",
+  "typename",
   "if",
   "else",
   "for",

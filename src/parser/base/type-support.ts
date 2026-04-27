@@ -84,6 +84,21 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
     return this.peekPrimitiveTypeKeyword() || this.peekSupportedTemplateTypeName() !== null;
   }
 
+  protected checkTypeStartWithParams(typeParams: string[]): boolean {
+    if (this.checkTypeStart()) return true;
+    const token = this.peek();
+    return token.kind === "identifier" && typeParams.includes(token.text);
+  }
+
+  protected parseTypeWithParams(typeParams: string[]): TypeNode | null {
+    const token = this.peek();
+    if (token.kind === "identifier" && typeParams.includes(token.text)) {
+      this.advance();
+      return { kind: "NamedType", name: token.text };
+    }
+    return this.parseType();
+  }
+
   protected wrapArrayDimensions(type: TypeNode, dimensions: number): ArrayDeclNode["type"] {
     let wrapped: TypeNode = type;
     for (let i = 0; i < dimensions; i += 1) {
