@@ -1,6 +1,11 @@
-import type { CompileResult, GlobalDeclNode, ProgramNode, Token } from "@/types";
+import type {
+  CompileResult,
+  GlobalDeclNode,
+  ProgramNode,
+  TemplateFunctionDeclNode,
+  Token,
+} from "@/types";
 import { pointerType, referenceType } from "@/types";
-import type { TemplateFunctionDeclNode } from "@/types";
 import { tokensStart } from "./base/index";
 import { ExpressionParser } from "./expression";
 
@@ -157,12 +162,18 @@ class Parser extends ExpressionParser {
       return null;
     }
 
+    this.activeTypeParams = typeParams;
+
     if (!this.checkTypeStart()) {
+      this.activeTypeParams = [];
       this.errorAtCurrent("expected return type after template parameter list");
       return null;
     }
     const returnType = this.parseTypeSpecifier();
-    if (returnType === null) return null;
+    if (returnType === null) {
+      this.activeTypeParams = [];
+      return null;
+    }
 
     let functionType = returnType;
     let cursor = this.index;
@@ -191,6 +202,7 @@ class Parser extends ExpressionParser {
     this.advance(); // (
     const params = this.parseParams();
     const body = this.parseRequiredBlock("expected block after function signature");
+    this.activeTypeParams = [];
     if (body === null) return null;
 
     return {

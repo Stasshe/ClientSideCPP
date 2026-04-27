@@ -36,6 +36,12 @@ import {
   validateTemplateCall,
 } from "./builtin-checker";
 import {
+  inferTypeArgs,
+  instantiateFunction,
+  instantiationKey,
+  type TypeArgMap,
+} from "./template-instantiator";
+import {
   inferBinaryType,
   isAssignable,
   isAssignableExpr,
@@ -56,12 +62,6 @@ import {
   isStringType,
   unwrapReference,
 } from "./type-utils";
-import {
-  type TypeArgMap,
-  inferTypeArgs,
-  instantiateFunction,
-  instantiationKey,
-} from "./template-instantiator";
 
 export type { ValidationContext };
 

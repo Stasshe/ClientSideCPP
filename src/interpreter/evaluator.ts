@@ -1,4 +1,5 @@
 import type { RuntimeLocation, RuntimeValue } from "@/runtime/value";
+import { inferTypeArgs, instantiateFunction } from "@/semantic/template-instantiator";
 import {
   compareSortableValues,
   compareValues,
@@ -22,7 +23,6 @@ import {
   evaluateTemplateCall,
   tryEvaluateBuiltinCall,
 } from "./builtin-eval";
-import { inferTypeArgs, instantiateFunction } from "@/semantic/template-instantiator";
 import { InterpreterRuntime } from "./runtime";
 
 export type RuntimeArgument =
@@ -215,7 +215,10 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
     line: number,
   ): RuntimeValue {
     if (argExprs.length !== templateFn.params.length) {
-      this.fail(`'${templateFn.name}' requires ${templateFn.params.length.toString()} arguments`, line);
+      this.fail(
+        `'${templateFn.name}' requires ${templateFn.params.length.toString()} arguments`,
+        line,
+      );
     }
     const argValues: RuntimeArgument[] = argExprs.map((argExpr, index) => {
       const param = templateFn.params[index];
@@ -235,7 +238,7 @@ export abstract class InterpreterEvaluator extends InterpreterRuntime {
     const argTypes = argValues.map((a) =>
       a.kind === "value"
         ? this.runtimeValueToType(a.value, line)
-        : a.type,
+        : this.runtimeValueToType(this.readLocation(a.target, line), line),
     );
 
     const map = inferTypeArgs(templateFn.typeParams, templateFn.params, argTypes);

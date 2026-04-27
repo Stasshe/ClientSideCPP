@@ -7,6 +7,8 @@ export abstract class BaseParserCore {
 
   protected readonly errors: CompileError[] = [];
 
+  protected activeTypeParams: string[] = [];
+
   constructor(tokens: Token[]) {
     this.tokens = tokens;
   }

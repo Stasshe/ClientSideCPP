@@ -11,7 +11,7 @@ import type {
 export type RuntimeLocation =
   | { kind: "binding"; scope: Map<string, RuntimeValue>; name: string; type: TypeNode }
   | { kind: "array"; ref: number; index: number; type: TypeNode }
-  | {
+  | { // これ特別扱いしちゃってる
       kind: "map";
       parent: RuntimeLocation;
       entryIndex: number;

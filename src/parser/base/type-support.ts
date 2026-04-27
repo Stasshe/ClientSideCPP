@@ -34,6 +34,15 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
   }
 
   protected parseType(): TypeNode | null {
+    const token = this.peek();
+    if (
+      token.kind === "identifier" &&
+      this.activeTypeParams.length > 0 &&
+      this.activeTypeParams.includes(token.text)
+    ) {
+      this.advance();
+      return { kind: "NamedType", name: token.text };
+    }
     const templateType = this.parseSupportedTemplateType();
     if (templateType !== null) {
       return templateType;
@@ -81,7 +90,12 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
   }
 
   protected override checkTypeStart(): boolean {
-    return this.peekPrimitiveTypeKeyword() || this.peekSupportedTemplateTypeName() !== null;
+    if (this.peekPrimitiveTypeKeyword() || this.peekSupportedTemplateTypeName() !== null) return true;
+    if (this.activeTypeParams.length > 0) {
+      const token = this.peek();
+      return token.kind === "identifier" && this.activeTypeParams.includes(token.text);
+    }
+    return false;
   }
 
   protected checkTypeStartWithParams(typeParams: string[]): boolean {

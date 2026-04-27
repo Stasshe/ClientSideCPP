@@ -86,6 +86,7 @@ int main() { return 0; }
 `,
       "",
     );
-    expect(result.status).toBe("compile_error");
+    expect(result.status).toBe("error");
+    expect(result.error?.message).toMatch(/redefinition of function/);
   });
 });

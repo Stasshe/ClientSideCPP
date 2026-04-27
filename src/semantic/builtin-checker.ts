@@ -15,10 +15,13 @@ import {
   tupleElementTypes,
   vectorElementType,
 } from "@/stdlib/template-types";
+import { inferTypeArgs, instantiateFunction, instantiationKey } from "./template-instantiator";
 import type {
   CompileError,
   ExprNode,
+  FunctionDeclNode,
   TemplateCallExprNode,
+  TemplateFunctionDeclNode,
   TypeNode,
   VectorTypeNode,
 } from "@/types";
