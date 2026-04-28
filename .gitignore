@@ -40,3 +40,8 @@ apps/web/next-env.d.ts
 *.temp
 
 tests/temp/*
+
+
+memo.md
+memo
+memo.txt
