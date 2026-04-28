@@ -1,7 +1,11 @@
 import type {
   ArrayDeclNode,
+  AssignTargetNode,
   BlockStmtNode,
+  CinStmtNode,
+  CoutStmtNode,
   DeclGroupStmtNode,
+  ExprNode,
   ExprStmtNode,
   ForInitNode,
   ForStmtNode,
@@ -11,6 +15,7 @@ import type {
   RangeForStmtNode,
   ReturnStmtNode,
   StatementNode,
+  TemplateArgNode,
   TemplateFunctionDeclNode,
   TypeNode,
   VarDeclNode,
@@ -87,13 +92,120 @@ function substituteStmt(stmt: StatementNode, map: TypeArgMap): StatementNode {
     case "ReturnStmt":
       return substituteReturn(stmt, map);
     case "ExprStmt":
+      return { ...stmt, expression: substituteExpr(stmt.expression, map) };
     case "CoutStmt":
+      return { ...stmt, values: stmt.values.map((e) => substituteExpr(e, map)) };
     case "CerrStmt":
+      return { ...stmt, values: stmt.values.map((e) => substituteExpr(e, map)) };
     case "CinStmt":
+      return { ...stmt, targets: stmt.targets.map((t) => substituteAssignTarget(t, map)) };
     case "BreakStmt":
     case "ContinueStmt":
       return stmt;
   }
+}
+
+function substituteAssignTarget(target: AssignTargetNode, map: TypeArgMap): AssignTargetNode {
+  switch (target.kind) {
+    case "Identifier":
+      return target;
+    case "IndexExpr":
+      return {
+        ...target,
+        target: substituteExpr(target.target, map),
+        index: substituteExpr(target.index, map),
+      };
+    case "DerefExpr":
+      return { ...target, pointer: substituteExpr(target.pointer, map) };
+    case "MemberAccessExpr":
+      return { ...target, receiver: substituteExpr(target.receiver, map) };
+    case "TemplateCallExpr":
+      return substituteTemplateCallAsAssignTarget(target, map);
+  }
+}
+
+function substituteTemplateCallAsAssignTarget(
+  target: Extract<AssignTargetNode, { kind: "TemplateCallExpr" }>,
+  map: TypeArgMap,
+): Extract<AssignTargetNode, { kind: "TemplateCallExpr" }> {
+  return {
+    ...target,
+    callee: {
+      ...target.callee,
+      templateArgs: target.callee.templateArgs.map((a) => substituteTemplateArg(a, map)),
+    },
+    args: target.args.map((a) => substituteExpr(a, map)),
+  };
+}
+
+function substituteExpr(expr: ExprNode, map: TypeArgMap): ExprNode {
+  switch (expr.kind) {
+    case "Literal":
+    case "Identifier":
+      return expr;
+    case "AssignExpr":
+      return {
+        ...expr,
+        target: substituteAssignTarget(expr.target, map),
+        value: substituteExpr(expr.value, map),
+      };
+    case "ConditionalExpr":
+      return {
+        ...expr,
+        condition: substituteExpr(expr.condition, map),
+        thenExpr: substituteExpr(expr.thenExpr, map),
+        elseExpr: substituteExpr(expr.elseExpr, map),
+      };
+    case "BinaryExpr":
+      return {
+        ...expr,
+        left: substituteExpr(expr.left, map),
+        right: substituteExpr(expr.right, map),
+      };
+    case "UnaryExpr":
+      return { ...expr, operand: substituteExpr(expr.operand, map) };
+    case "AddressOfExpr":
+      return { ...expr, target: substituteAssignTarget(expr.target, map) };
+    case "DerefExpr":
+      return { ...expr, pointer: substituteExpr(expr.pointer, map) };
+    case "CallExpr":
+      return { ...expr, args: expr.args.map((a) => substituteExpr(a, map)) };
+    case "TemplateIdExpr":
+      return {
+        ...expr,
+        templateArgs: expr.templateArgs.map((a) => substituteTemplateArg(a, map)),
+      };
+    case "TemplateCallExpr":
+      return {
+        ...expr,
+        callee: {
+          ...expr.callee,
+          templateArgs: expr.callee.templateArgs.map((a) => substituteTemplateArg(a, map)),
+        },
+        args: expr.args.map((a) => substituteExpr(a, map)),
+      };
+    case "MemberAccessExpr":
+      return { ...expr, receiver: substituteExpr(expr.receiver, map) };
+    case "MethodCallExpr":
+      return {
+        ...expr,
+        receiver: substituteExpr(expr.receiver, map),
+        args: expr.args.map((a) => substituteExpr(a, map)),
+      };
+    case "IndexExpr":
+      return {
+        ...expr,
+        target: substituteExpr(expr.target, map),
+        index: substituteExpr(expr.index, map),
+      };
+  }
+}
+
+function substituteTemplateArg(arg: TemplateArgNode, map: TypeArgMap): TemplateArgNode {
+  if (arg.kind === "TypeTemplateArg") {
+    return { ...arg, type: substituteTypeNode(arg.type, map) };
+  }
+  return arg;
 }
 
 function substituteVarDecl(decl: VarDeclNode, map: TypeArgMap): VarDeclNode {
@@ -148,7 +260,7 @@ function substituteWhile(stmt: WhileStmtNode, map: TypeArgMap): WhileStmtNode {
 }
 
 function substituteReturn(stmt: ReturnStmtNode, map: TypeArgMap): ReturnStmtNode {
-  return stmt;
+  return { ...stmt, value: stmt.value !== null ? substituteExpr(stmt.value, map) : null };
 }
 
 export function inferTypeArgs(

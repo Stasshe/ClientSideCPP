@@ -131,4 +131,49 @@ int main() {
     }
     expect(result.errors[0]?.message).toMatch(/cannot deduce template arguments/);
   });
+
+  it("template body with nested explicit template call (ExprStmt substitution)", () => {
+    const result = compileAndRun(
+      `
+#include<iostream>
+using namespace std;
+template<typename T>
+T twice(T x) {
+  return x + x;
+}
+template<typename T>
+void printTwice(T x) {
+  cout << twice<T>(x) << '\\n';
+}
+int main() {
+  printTwice<int>(5);
+  return 0;
+}
+`,
+      "",
+    );
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("10\n");
+  });
+
+  it("template body with make_pair in return (ReturnStmt substitution)", () => {
+    const result = compileAndRun(
+      `
+#include<iostream>
+using namespace std;
+template<typename T>
+pair<T, T> mirror(T x) {
+  return make_pair(x, x);
+}
+int main() {
+  pair<int, int> p = mirror(7);
+  cout << p.first << ' ' << p.second << '\\n';
+  return 0;
+}
+`,
+      "",
+    );
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("7 7\n");
+  });
 });

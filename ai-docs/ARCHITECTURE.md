@@ -20,7 +20,7 @@ index.ts → すべて
 |---|---|
 | `validator.ts` | AST 全体の型検査・エラー収集。メインエントリ |
 | `builtin-checker.ts` | 組み込み関数・テンプレート呼び出し・メソッド/メンバー呼び出しの型検査 |
-| `template-instantiator.ts` | 関数テンプレートの型引数推論・単相化 |
+| `template-instantiator.ts` | 関数テンプレートの型引数推論・単相化。`substituteExpr` で式内の TypeTemplateArg まで再帰置換する |
 | `type-compat.ts` | 型の互換性判定（`sameType`, `isAssignable`, `inferBinaryType` 等） |
 | `type-utils.ts` | 型プレディケート純関数（`isIntType`, `containsVoid` 等） |
 
@@ -43,9 +43,14 @@ validateBuiltinCall(callee, args, line, col, context, validateExpr, inferExprTyp
 
 | ファイル | 責務 |
 |---|---|
-| `evaluator.ts` | 式・文の評価メインロジック |
-| `builtin-eval.ts` | 組み込み関数・テンプレート・メソッド/メンバー呼び出しの評価 |
+| `index.ts` | 文実行・関数呼び出し・range-for・デバッグ連携のメインエントリ |
+| `evaluator.ts` | 式評価・lvalue location 解決（pair メンバー・map インデックス・tuple get） |
+| `builtin-eval.ts` | 組み込み関数・テンプレート・メソッド/メンバー呼び出しの評価（stdlib dispatch への薄い橋渡し） |
 | `runtime/` | ランタイム支援（変数スコープ・型変換・デフォルト値等） |
+
+### evaluator.ts における objectKind 分岐について
+
+`pair.first`/`pair.second` の lvalue location 解決、map インデックスの lvalue location 解決、`get<I>(t)` の lvalue location 解決は `evaluator.ts` の core に直書きされている。これは stdlib の registry pattern ではなく、言語の代入意味論（RuntimeLocation）に属するため意図的な設計。stdlib の registry は rvalue（値の読み取り）専用。
 
 ### EvalCtx パターン
 

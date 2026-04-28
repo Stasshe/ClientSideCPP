@@ -596,23 +596,44 @@ type RuntimeErrorInfo = {
 ### 11.1 実行時の値表現
 
 ```typescript
+type RuntimeObjectValue =
+  | { kind: "object"; objectKind: "vector"; type: VectorTypeNode; ref: number }
+  | { kind: "object"; objectKind: "map"; type: MapTypeNode; entries: { key: Value; value: Value }[] }
+  | { kind: "object"; objectKind: "pair"; type: PairTypeNode; first: Value; second: Value }
+  | { kind: "object"; objectKind: "tuple"; type: TupleTypeNode; values: Value[] }
+  | { kind: "object"; objectKind: "iterator"; type: IteratorTypeNode; ref: number; index: number }
+
 type Value =
   | { kind: "int"; value: bigint }
   | { kind: "double"; value: number }
   | { kind: "bool"; value: boolean }
+  | { kind: "char"; value: string }
   | { kind: "string"; value: string }
-  | { kind: "pair"; first: Value; second: Value }
-  | { kind: "tuple"; values: Value[] }
-  | { kind: "array"; ref: ArrayId }
+  | RuntimeObjectValue
+  | { kind: "array"; ref: number; type: TypeNode }
   | { kind: "pointer"; pointeeType: TypeNode; target: RuntimeLocation | null }
   | { kind: "reference"; type: ReferenceTypeNode; target: RuntimeLocation }
   | { kind: "void" }
   | { kind: "uninitialized"; expectedType: TypeNode }
 ```
 
-- `pair` / `tuple` は実行時値として直接保持する
-- pointer / reference は `RuntimeLocation` を通じて、変数・配列要素・tuple 要素・文字列要素を指せる
+- `vector`、`map`、`pair`、`tuple`、`__iterator` はすべて `kind: "object"` に統一し、`objectKind` で種別を識別する
+- `vector` の実体は内部 `ArrayStore` に `ref` 経由でアクセスする（固定長配列と同じストレージを共用）
+- `map` の entries は inline に保持する（対応する `ArrayStore` は持たない）
+- `pair` / `tuple` の要素値は inline に保持する
+- `__iterator` は `vector` の `begin()/end()` が返す内部型。`sort`/`reverse`/`fill` 専用で、ユーザー定義 iterator は非対応
+- pointer / reference は `RuntimeLocation` を通じて、変数・配列要素・pair メンバー・tuple 要素・文字列要素を指せる
 - `uninitialized` はローカル未初期化変数の表現であり、読み取り時に実行時エラーになる
+
+```typescript
+type RuntimeLocation =
+  | { kind: "binding"; scope: Map<string, Value>; name: string; type: TypeNode }
+  | { kind: "array"; ref: number; index: number; type: TypeNode }
+  | { kind: "object"; parent: RuntimeLocation; objectKind: "map"; entryIndex: number; type: TypeNode; access: "entry" | "value" }
+  | { kind: "object"; parent: RuntimeLocation; objectKind: "pair"; member: "first" | "second"; type: TypeNode }
+  | { kind: "object"; parent: RuntimeLocation; objectKind: "tuple"; index: number; type: TypeNode }
+  | { kind: "string"; parent: RuntimeLocation; index: number }
+```
 
 ### 11.2 スコープとストレージ
 
@@ -632,7 +653,7 @@ type ArrayStore = {
 
 - 実行中のブロックスコープは `scopeStack: Scope[]` で管理する
 - 関数呼び出し履歴は `frameStack: Frame[]` で管理する
-- 固定長配列と `vector` の実体は `Map<ArrayId, ArrayStore>` に保持する
+- 固定長配列と `vector` の実体は `Map<ArrayId, ArrayStore>` に保持する（`vector` は `objectKind: "vector"` の Value が `ref` で参照）
 - 多次元固定長配列は内部的には平坦化した 1 次元ストレージとして管理する
 - 実行時エラー発生時は `frameStack` をもとに stack trace を組み立て、最内周フレームから順に露出する
 

@@ -40,17 +40,20 @@ export abstract class ExpressionParser extends BaseParser {
           endLine: 1,
           endCol: 1,
         };
-      const segmentParser = new StreamOperandParser([
-        ...segment,
-        {
-          kind: "eof",
-          text: "<eof>",
-          line: eof.line,
-          col: eof.col,
-          endLine: eof.endLine,
-          endCol: eof.endCol,
-        },
-      ]);
+      const segmentParser = new StreamOperandParser(
+        [
+          ...segment,
+          {
+            kind: "eof",
+            text: "<eof>",
+            line: eof.line,
+            col: eof.col,
+            endLine: eof.endLine,
+            endCol: eof.endCol,
+          },
+        ],
+        this.activeTypeParams,
+      );
       const parsed = segmentParser.parseOperand();
       if (parsed === null) {
         this.errors.push(...segmentParser.getErrors());
@@ -550,6 +553,11 @@ export abstract class ExpressionParser extends BaseParser {
 }
 
 class StreamOperandParser extends ExpressionParser {
+  constructor(tokens: import("@/types").Token[], typeParams: string[] = []) {
+    super(tokens);
+    this.activeTypeParams = typeParams;
+  }
+
   parseOperand(): ExprNode | null {
     const expr = this.parseExpression();
     if (this.errors.length > 0) {
