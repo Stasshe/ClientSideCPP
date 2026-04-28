@@ -6,6 +6,7 @@ import type {
   TemplateIdExprNode,
   TypeTemplateArgNode,
 } from "@/types";
+import { getBuiltinTemplateComparatorSpec } from "./metadata";
 
 export function isTypeTemplateArg(arg: TemplateArgNode): arg is TypeTemplateArgNode {
   return arg.kind === "TypeTemplateArg";
@@ -41,4 +42,16 @@ export function isTupleGetTemplateCall(expr: ExprNode): expr is TemplateCallExpr
     isIntTemplateArg(expr.callee.templateArgs[0] as TemplateArgNode) &&
     expr.args.length === 1
   );
+}
+
+export function isValidBuiltinTemplateComparatorCall(expr: ExprNode): expr is TemplateCallExprNode {
+  if (expr.kind !== "TemplateCallExpr") {
+    return false;
+  }
+  const spec = getBuiltinTemplateComparatorSpec(expr.callee.template);
+  if (spec === null || expr.args.length !== spec.callArgs) {
+    return false;
+  }
+  const argCount = expr.callee.templateArgs.length;
+  return argCount >= spec.minTypeArgs && argCount <= spec.maxTypeArgs;
 }

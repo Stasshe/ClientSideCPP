@@ -216,7 +216,6 @@ function normalizeCompatibilitySyntax(line: string): string {
   result = result.replace(/\bios_base::/g, "");
   result = result.replace(/\bios::/g, "");
   result = result.replace(/\bsigned\s+main\s*\(/, "int main(");
-  result = result.replace(/\bgreater\s*<\s*>\s*\(\s*\)/g, "greater<int>()");
   result = result.replace(/(\b[A-Za-z_][A-Za-z0-9_]*\b)\s*>>=\s*([^;]+);/g, "$1 = $1 >> ($2);");
   result = result.replace(/(\b[A-Za-z_][A-Za-z0-9_]*\b)\s*<<=\s*([^;]+);/g, "$1 = $1 << ($2);");
   result = normalizeScientificIntegerLiterals(result);

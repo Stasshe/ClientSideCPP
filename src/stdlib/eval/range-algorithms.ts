@@ -2,7 +2,7 @@ import type { RuntimeValue } from "@/runtime/value";
 import { compareSortableValues } from "@/stdlib/builtins/compare";
 import type { EvalCtx } from "@/stdlib/eval-context";
 import { registerFreeCall } from "@/stdlib/eval-registry";
-import { getBuiltinTemplateComparatorSpec } from "@/stdlib/metadata";
+import { isValidBuiltinTemplateComparatorCall } from "@/stdlib/template-exprs";
 import { vectorElementType } from "@/stdlib/template-types";
 import type { ExprNode, VectorTypeNode } from "@/types";
 import { isVectorType } from "@/types";
@@ -66,11 +66,7 @@ function isDescendingSortComparator(
   ctx: EvalCtx,
 ): boolean {
   if (expr === undefined) return false;
-  if (
-    expr.kind === "TemplateCallExpr" &&
-    expr.args.length === 0 &&
-    getBuiltinTemplateComparatorSpec(expr.callee.template) !== null
-  ) {
+  if (isValidBuiltinTemplateComparatorCall(expr)) {
     return true;
   }
   ctx.fail("unsupported sort comparator", line);

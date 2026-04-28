@@ -1,4 +1,5 @@
 export type SupportedTemplateTypeName = "vector" | "map" | "pair" | "tuple";
+export type InternalTemplateTypeName = "__iterator";
 export type UnsupportedTemplateTypeName =
   | "unordered_map"
   | "priority_queue"
@@ -11,8 +12,9 @@ export type BuiltinTemplateComparatorName = "greater";
 
 export type SupportedTemplateTypeSpec = {
   kind: "template_type";
-  name: SupportedTemplateTypeName;
+  name: SupportedTemplateTypeName | InternalTemplateTypeName;
   arity: number;
+  internal?: boolean;
 };
 
 export type UnsupportedTemplateTypeSpec = {
@@ -56,6 +58,10 @@ const SUPPORTED_TEMPLATE_TYPE_SPECS: Record<SupportedTemplateTypeName, Supported
     pair: { kind: "template_type", name: "pair", arity: 2 },
     tuple: { kind: "template_type", name: "tuple", arity: -1 },
   };
+
+const INTERNAL_TEMPLATE_TYPE_SPECS: Record<InternalTemplateTypeName, SupportedTemplateTypeSpec> = {
+  __iterator: { kind: "template_type", name: "__iterator", arity: 1, internal: true },
+};
 
 const UNSUPPORTED_TEMPLATE_TYPE_SPECS: Record<
   UnsupportedTemplateTypeName,
@@ -101,7 +107,7 @@ const BUILTIN_TEMPLATE_COMPARATOR_SPECS: Record<
   greater: {
     kind: "template_comparator",
     name: "greater",
-    minTypeArgs: 1,
+    minTypeArgs: 0,
     maxTypeArgs: 1,
     callArgs: 0,
   },
@@ -109,6 +115,14 @@ const BUILTIN_TEMPLATE_COMPARATOR_SPECS: Record<
 
 export function getSupportedTemplateTypeSpec(value: string): SupportedTemplateTypeSpec | null {
   return SUPPORTED_TEMPLATE_TYPE_SPECS[value as SupportedTemplateTypeName] ?? null;
+}
+
+export function getTemplateTypeSpec(value: string): SupportedTemplateTypeSpec | null {
+  return (
+    getSupportedTemplateTypeSpec(value) ??
+    INTERNAL_TEMPLATE_TYPE_SPECS[value as InternalTemplateTypeName] ??
+    null
+  );
 }
 
 export function getUnsupportedTemplateTypeSpec(value: string): UnsupportedTemplateTypeSpec | null {

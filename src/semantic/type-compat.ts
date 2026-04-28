@@ -1,24 +1,13 @@
 import { isTupleGetTemplateCall } from "@/stdlib/template-exprs";
-import {
-  mapKeyType,
-  mapValueType,
-  pairFirstType,
-  pairSecondType,
-  tupleElementTypes,
-  vectorElementType,
-} from "@/stdlib/template-types";
 import type { BinaryExprNode, ExprNode, TypeNode } from "@/types";
 import {
   isArrayType,
-  isMapType,
   isPairType,
   isPointerType,
   isPrimitiveType,
   isReferenceType,
+  isTemplateInstanceType,
   isTupleType,
-  isVectorType,
-  pairType,
-  tupleType,
   typeToString,
 } from "@/types";
 import {
@@ -38,39 +27,15 @@ export function sameType(left: TypeNode, right: TypeNode): boolean {
   if (isArrayType(left) || isArrayType(right)) {
     return isArrayType(left) && isArrayType(right) && sameType(left.elementType, right.elementType);
   }
-  if (isVectorType(left) || isVectorType(right)) {
+  if (isTemplateInstanceType(left) || isTemplateInstanceType(right)) {
     return (
-      isVectorType(left) &&
-      isVectorType(right) &&
-      sameType(vectorElementType(left), vectorElementType(right))
-    );
-  }
-  if (isMapType(left) || isMapType(right)) {
-    return (
-      isMapType(left) &&
-      isMapType(right) &&
-      sameType(mapKeyType(left), mapKeyType(right)) &&
-      sameType(mapValueType(left), mapValueType(right))
-    );
-  }
-  if (isPairType(left) || isPairType(right)) {
-    return (
-      isPairType(left) &&
-      isPairType(right) &&
-      sameType(pairFirstType(left), pairFirstType(right)) &&
-      sameType(pairSecondType(left), pairSecondType(right))
-    );
-  }
-  if (isTupleType(left) || isTupleType(right)) {
-    const leftEls = isTupleType(left) ? tupleElementTypes(left) : [];
-    const rightEls = isTupleType(right) ? tupleElementTypes(right) : [];
-    return (
-      isTupleType(left) &&
-      isTupleType(right) &&
-      leftEls.length === rightEls.length &&
-      leftEls.every((t, i) => {
-        const r = rightEls[i];
-        return r !== undefined && sameType(t, r);
+      isTemplateInstanceType(left) &&
+      isTemplateInstanceType(right) &&
+      left.template.name === right.template.name &&
+      left.templateArgs.length === right.templateArgs.length &&
+      left.templateArgs.every((arg, index) => {
+        const rightArg = right.templateArgs[index];
+        return rightArg !== undefined && sameType(arg, rightArg);
       })
     );
   }
@@ -93,26 +58,13 @@ export function isAssignable(source: TypeNode, target: TypeNode): boolean {
   if (sameType(source, target)) {
     return true;
   }
-  if (isPairType(source) && isPairType(target)) {
+  if (isTemplateInstanceType(source) && isTemplateInstanceType(target)) {
     return (
-      isAssignable(pairFirstType(source), pairFirstType(target)) &&
-      isAssignable(pairSecondType(source), pairSecondType(target))
-    );
-  }
-  if (isMapType(source) && isMapType(target)) {
-    return (
-      isAssignable(mapKeyType(source), mapKeyType(target)) &&
-      isAssignable(mapValueType(source), mapValueType(target))
-    );
-  }
-  if (isTupleType(source) && isTupleType(target)) {
-    const srcEls = tupleElementTypes(source);
-    const tgtEls = tupleElementTypes(target);
-    return (
-      srcEls.length === tgtEls.length &&
-      srcEls.every((t, i) => {
-        const tgt = tgtEls[i];
-        return tgt !== undefined && isAssignable(t, tgt);
+      source.template.name === target.template.name &&
+      source.templateArgs.length === target.templateArgs.length &&
+      source.templateArgs.every((templateArg, index) => {
+        const targetArg = target.templateArgs[index];
+        return targetArg !== undefined && isAssignable(templateArg, targetArg);
       })
     );
   }
@@ -274,31 +226,11 @@ export function resolveConditionalType(
     return thenType;
   }
 
-  if (isPairType(thenType) && isPairType(elseType)) {
-    const first = resolveConditionalType(
-      pairFirstType(thenType),
-      pairFirstType(elseType),
-      line,
-      col,
-      pushError,
-    );
-    const second = resolveConditionalType(
-      pairSecondType(thenType),
-      pairSecondType(elseType),
-      line,
-      col,
-      pushError,
-    );
-    if (first === null || second === null) {
-      return null;
-    }
-    return pairType(first, second);
-  }
-
-  if (isTupleType(thenType) && isTupleType(elseType)) {
-    const thenEls = tupleElementTypes(thenType);
-    const elseEls = tupleElementTypes(elseType);
-    if (thenEls.length !== elseEls.length) {
+  if (isTemplateInstanceType(thenType) && isTemplateInstanceType(elseType)) {
+    if (
+      thenType.template.name !== elseType.template.name ||
+      thenType.templateArgs.length !== elseType.templateArgs.length
+    ) {
       pushError(
         line,
         col,
@@ -306,10 +238,10 @@ export function resolveConditionalType(
       );
       return null;
     }
-    const elementTypes: TypeNode[] = [];
-    for (let i = 0; i < thenEls.length; i += 1) {
-      const l = thenEls[i];
-      const r = elseEls[i];
+    const resolvedArgs: TypeNode[] = [];
+    for (let i = 0; i < thenType.templateArgs.length; i += 1) {
+      const l = thenType.templateArgs[i];
+      const r = elseType.templateArgs[i];
       if (l === undefined || r === undefined) {
         return null;
       }
@@ -317,9 +249,13 @@ export function resolveConditionalType(
       if (resolved === null) {
         return null;
       }
-      elementTypes.push(resolved);
+      resolvedArgs.push(resolved);
     }
-    return tupleType(elementTypes);
+    return {
+      kind: "TemplateInstanceType",
+      template: thenType.template,
+      templateArgs: resolvedArgs,
+    };
   }
 
   if (isPointerType(thenType) && isNullPointerType(elseType)) {

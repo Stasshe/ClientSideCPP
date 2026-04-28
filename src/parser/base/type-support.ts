@@ -1,19 +1,8 @@
-import {
-  mapKeyType,
-  mapValueType,
-  pairFirstType,
-  pairSecondType,
-  tupleElementTypes,
-  vectorElementType,
-} from "@/stdlib/template-types";
 import type { ArrayDeclNode, PrimitiveTypeNode, Token, TypeNode, VectorDeclNode } from "@/types";
 import {
   arrayType,
-  isMapType,
-  isPairType,
   isPrimitiveType,
   isTemplateInstanceType,
-  isTupleType,
   isVectorType,
   pointerType,
   templateInstanceType,
@@ -123,22 +112,11 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
     if (type.kind === "ReferenceType") {
       return this.isVoidTypeNode(type.referredType);
     }
-    if (isPairType(type)) {
-      return this.isVoidTypeNode(pairFirstType(type)) || this.isVoidTypeNode(pairSecondType(type));
-    }
-    if (isMapType(type)) {
-      return this.isVoidTypeNode(mapKeyType(type)) || this.isVoidTypeNode(mapValueType(type));
-    }
-    if (isTupleType(type)) {
-      return tupleElementTypes(type).some((elementType) => this.isVoidTypeNode(elementType));
-    }
-    if (type.kind === "ArrayType" || isVectorType(type)) {
-      return this.isVoidTypeNode(
-        type.kind === "ArrayType" ? type.elementType : vectorElementType(type),
-      );
-    }
     if (isTemplateInstanceType(type)) {
       return type.templateArgs.some((templateArg) => this.isVoidTypeNode(templateArg));
+    }
+    if (type.kind === "ArrayType") {
+      return this.isVoidTypeNode(type.elementType);
     }
     return false;
   }

@@ -3,8 +3,8 @@ import { registerFreeCall } from "@/stdlib/check-registry";
 import {
   describeBuiltinArity,
   getBuiltinRangeAlgorithmSpec,
-  getBuiltinTemplateComparatorSpec,
 } from "@/stdlib/metadata";
+import { isValidBuiltinTemplateComparatorCall } from "@/stdlib/template-exprs";
 import { iteratorContainerType, vectorElementType } from "@/stdlib/template-types";
 import type { ExprNode, TypeNode, VectorTypeNode } from "@/types";
 import { isIteratorType, isVectorType } from "@/types";
@@ -21,13 +21,7 @@ export function checkSort(args: ExprNode[], line: number, col: number, ctx: Chec
   validateVectorRangeArgs(args[0], args[1], "sort", line, col, ctx);
   if (args[2] !== undefined) {
     const comparator = args[2];
-    if (
-      !(
-        comparator.kind === "TemplateCallExpr" &&
-        getBuiltinTemplateComparatorSpec(comparator.callee.template) !== null &&
-        comparator.args.length === 0
-      )
-    ) {
+    if (!isValidBuiltinTemplateComparatorCall(comparator)) {
       ctx.pushError(comparator.line, comparator.col, "unsupported sort comparator");
     }
   }

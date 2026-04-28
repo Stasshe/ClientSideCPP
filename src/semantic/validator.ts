@@ -1,4 +1,4 @@
-import { getSupportedTemplateTypeSpec, getUnsupportedTemplateTypeSpec } from "@/stdlib/metadata";
+import { getTemplateTypeSpec, getUnsupportedTemplateTypeSpec } from "@/stdlib/metadata";
 import {
   mapKeyType,
   mapValueType,
@@ -724,11 +724,11 @@ function validateTypeNode(
       validateTypeNode(type.referredType, line, col, context);
       return;
     case "TemplateInstanceType": {
-      const spec = getSupportedTemplateTypeSpec(type.template.name);
+      const spec = getTemplateTypeSpec(type.template.name);
       const unsupportedSpec = getUnsupportedTemplateTypeSpec(type.template.name);
       if (unsupportedSpec !== null) {
         pushError(context, line, col, "this feature is not supported in this interpreter");
-      } else if (type.template.name !== "__iterator" && spec === null) {
+      } else if (spec === null) {
         pushError(context, line, col, `'${type.template.name}' is not a supported template type`);
       } else if (
         spec !== null &&

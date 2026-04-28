@@ -1,21 +1,10 @@
-import {
-  mapKeyType,
-  mapValueType,
-  pairFirstType,
-  pairSecondType,
-  tupleElementTypes,
-  vectorElementType,
-} from "@/stdlib/template-types";
 import type { ExprNode, TypeNode } from "@/types";
 import {
   isArrayType,
-  isMapType,
-  isPairType,
   isPointerType,
   isPrimitiveType,
   isReferenceType,
-  isTupleType,
-  isVectorType,
+  isTemplateInstanceType,
 } from "@/types";
 
 export function isIntType(type: TypeNode): boolean {
@@ -63,17 +52,11 @@ export function containsVoid(type: TypeNode): boolean {
   if (isReferenceType(type)) {
     return containsVoid(type.referredType);
   }
-  if (isPairType(type)) {
-    return containsVoid(pairFirstType(type)) || containsVoid(pairSecondType(type));
+  if (isTemplateInstanceType(type)) {
+    return type.templateArgs.some((templateArg) => containsVoid(templateArg));
   }
-  if (isMapType(type)) {
-    return containsVoid(mapKeyType(type)) || containsVoid(mapValueType(type));
-  }
-  if (isTupleType(type)) {
-    return tupleElementTypes(type).some((t) => containsVoid(t));
-  }
-  if (isArrayType(type) || isVectorType(type)) {
-    return containsVoid(isArrayType(type) ? type.elementType : vectorElementType(type));
+  if (isArrayType(type)) {
+    return containsVoid(type.elementType);
   }
   return false;
 }
@@ -85,19 +68,11 @@ export function containsReferenceNested(type: TypeNode): boolean {
   if (isPointerType(type)) {
     return containsReferenceNested(type.pointeeType);
   }
-  if (isPairType(type)) {
-    return (
-      containsReferenceNested(pairFirstType(type)) || containsReferenceNested(pairSecondType(type))
-    );
+  if (isTemplateInstanceType(type)) {
+    return type.templateArgs.some((templateArg) => containsReferenceNested(templateArg));
   }
-  if (isMapType(type)) {
-    return containsReferenceNested(mapKeyType(type)) || containsReferenceNested(mapValueType(type));
-  }
-  if (isTupleType(type)) {
-    return tupleElementTypes(type).some((t) => containsReferenceNested(t));
-  }
-  if (isArrayType(type) || isVectorType(type)) {
-    return containsReferenceNested(isArrayType(type) ? type.elementType : vectorElementType(type));
+  if (isArrayType(type)) {
+    return containsReferenceNested(type.elementType);
   }
   return false;
 }

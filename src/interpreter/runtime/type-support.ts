@@ -16,6 +16,8 @@ import {
   isPointerType,
   isPrimitiveType,
   isReferenceType,
+  isIteratorType,
+  isTemplateInstanceType,
   isTupleType,
   isVectorType,
   typeToString,
@@ -73,6 +75,9 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
           this.defaultValueForType(elementType, line),
         ),
       };
+    }
+    if (isTemplateInstanceType(type)) {
+      this.fail(`default value is not defined for '${typeToString(type)}'`, line);
     }
     this.fail("fixed array value requires dimensions", line);
   }
@@ -178,6 +183,19 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
         ),
       };
     }
+    if (isIteratorType(type)) {
+      if (value.kind === "uninitialized") {
+        return { kind: "uninitialized", expectedType: type };
+      }
+      if (value.kind !== "iterator" || !this.sameType(type, value.type)) {
+        const actualType = value.kind === "iterator" ? this.typeToRuntimeString(value.type) : value.kind;
+        this.fail(
+          `cannot convert '${actualType}' to '${this.typeToRuntimeString(type)}'`,
+          line,
+        );
+      }
+      return value;
+    }
 
     if (value.kind !== "array") {
       this.fail(`cannot convert '${value.kind}' to '${this.typeKindName(type)}'`, line);
@@ -217,6 +235,7 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
     if (isMapType(type)) return "map";
     if (isPairType(type)) return "pair";
     if (isTupleType(type)) return "tuple";
+    if (isTemplateInstanceType(type)) return type.template.name;
     if (isPointerType(type)) return "pointer";
     return "reference";
   }
@@ -246,6 +265,8 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
     switch (value.kind) {
       case "array":
         return `<${isVectorType(value.type) ? "vector" : "array"}#${value.ref}>`;
+      case "iterator":
+        return `<iterator:${typeToString(value.type)}@${value.ref}:${value.index}>`;
       case "pointer":
         return value.target === null ? "nullptr" : `<pointer:${typeToString(value.pointeeType)}>`;
       case "reference":
@@ -319,46 +340,22 @@ export abstract class InterpreterRuntimeTypeSupport extends InterpreterRuntimeCo
     if (isPrimitiveType(left) || isPrimitiveType(right)) {
       return isPrimitiveType(left) && isPrimitiveType(right) && left.name === right.name;
     }
-    if (isArrayType(left) || isArrayType(right)) {
+  if (isArrayType(left) || isArrayType(right)) {
       return (
         isArrayType(left) &&
         isArrayType(right) &&
         this.sameType(left.elementType, right.elementType)
       );
     }
-    if (isVectorType(left) || isVectorType(right)) {
+    if (isTemplateInstanceType(left) || isTemplateInstanceType(right)) {
       return (
-        isVectorType(left) &&
-        isVectorType(right) &&
-        this.sameType(vectorElementType(left), vectorElementType(right))
-      );
-    }
-    if (isMapType(left) || isMapType(right)) {
-      return (
-        isMapType(left) &&
-        isMapType(right) &&
-        this.sameType(mapKeyType(left), mapKeyType(right)) &&
-        this.sameType(mapValueType(left), mapValueType(right))
-      );
-    }
-    if (isPairType(left) || isPairType(right)) {
-      return (
-        isPairType(left) &&
-        isPairType(right) &&
-        this.sameType(pairFirstType(left), pairFirstType(right)) &&
-        this.sameType(pairSecondType(left), pairSecondType(right))
-      );
-    }
-    if (isTupleType(left) || isTupleType(right)) {
-      const leftElements = isTupleType(left) ? tupleElementTypes(left) : [];
-      const rightElements = isTupleType(right) ? tupleElementTypes(right) : [];
-      return (
-        isTupleType(left) &&
-        isTupleType(right) &&
-        leftElements.length === rightElements.length &&
-        leftElements.every((elementType, index) => {
-          const rightElementType = rightElements[index];
-          return rightElementType !== undefined && this.sameType(elementType, rightElementType);
+        isTemplateInstanceType(left) &&
+        isTemplateInstanceType(right) &&
+        left.template.name === right.template.name &&
+        left.templateArgs.length === right.templateArgs.length &&
+        left.templateArgs.every((templateArg, index) => {
+          const rightTemplateArg = right.templateArgs[index];
+          return rightTemplateArg !== undefined && this.sameType(templateArg, rightTemplateArg);
         })
       );
     }
