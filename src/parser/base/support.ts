@@ -1,4 +1,4 @@
-import { getUnsupportedTemplateTypeSpec } from "@/stdlib/registry";
+import { getUnsupportedTemplateTypeSpec } from "@/stdlib/metadata";
 import { isTupleGetTemplateCall } from "@/stdlib/template-exprs";
 import type {
   ArrayDeclNode,

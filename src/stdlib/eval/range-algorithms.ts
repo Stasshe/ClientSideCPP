@@ -2,7 +2,7 @@ import type { RuntimeValue } from "@/runtime/value";
 import { compareSortableValues } from "@/stdlib/builtins/compare";
 import type { EvalCtx } from "@/stdlib/eval-context";
 import { registerFreeCall } from "@/stdlib/eval-registry";
-import { getBuiltinTemplateComparatorSpec } from "@/stdlib/registry";
+import { getBuiltinTemplateComparatorSpec } from "@/stdlib/metadata";
 import { vectorElementType } from "@/stdlib/template-types";
 import type { ExprNode, VectorTypeNode } from "@/types";
 import { isVectorType } from "@/types";

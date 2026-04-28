@@ -1,6 +1,6 @@
 import type { CheckCtx } from "@/stdlib/check-context";
 import { registerFreeCall } from "@/stdlib/check-registry";
-import { describeBuiltinArity, getBuiltinValueFunctionSpec } from "@/stdlib/registry";
+import { describeBuiltinArity, getBuiltinValueFunctionSpec } from "@/stdlib/metadata";
 import type { ExprNode, TypeNode } from "@/types";
 import { typeToString } from "@/types";
 

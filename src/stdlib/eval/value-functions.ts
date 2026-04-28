@@ -1,7 +1,7 @@
 import type { RuntimeValue } from "@/runtime/value";
 import type { EvalCtx } from "@/stdlib/eval-context";
 import { registerFreeCall } from "@/stdlib/eval-registry";
-import { describeBuiltinArity, getBuiltinValueFunctionSpec } from "@/stdlib/registry";
+import { describeBuiltinArity, getBuiltinValueFunctionSpec } from "@/stdlib/metadata";
 import type { ExprNode } from "@/types";
 
 export function evalAbs(args: ExprNode[], line: number, ctx: EvalCtx): RuntimeValue {

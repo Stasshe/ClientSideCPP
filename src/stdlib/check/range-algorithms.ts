@@ -4,7 +4,7 @@ import {
   describeBuiltinArity,
   getBuiltinRangeAlgorithmSpec,
   getBuiltinTemplateComparatorSpec,
-} from "@/stdlib/registry";
+} from "@/stdlib/metadata";
 import { vectorElementType } from "@/stdlib/template-types";
 import type { ExprNode, TypeNode, VectorTypeNode } from "@/types";
 import { isVectorType } from "@/types";

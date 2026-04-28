@@ -4,7 +4,7 @@ import {
   dispatchTemplateCall,
   type CheckCtx,
 } from "@/stdlib/check";
-import { getBuiltinTemplateComparatorSpec } from "@/stdlib/registry";
+import { getBuiltinTemplateComparatorSpec } from "@/stdlib/metadata";
 import type {
   CompileError,
   ExprNode,

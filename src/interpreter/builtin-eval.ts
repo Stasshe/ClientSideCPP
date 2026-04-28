@@ -11,7 +11,7 @@ import {
   dispatchTemplateCall,
   type EvalCtx,
 } from "@/stdlib/eval";
-import { getBuiltinTemplateComparatorSpec } from "@/stdlib/registry";
+import { getBuiltinTemplateComparatorSpec } from "@/stdlib/metadata";
 import { isTupleGetTemplateCall } from "@/stdlib/template-exprs";
 import type { ExprNode, TemplateCallExprNode } from "@/types";
 

@@ -1,4 +1,4 @@
-import { getSupportedTemplateTypeSpec } from "@/stdlib/registry";
+import { getSupportedTemplateTypeSpec } from "@/stdlib/metadata";
 import {
   mapKeyType,
   mapValueType,

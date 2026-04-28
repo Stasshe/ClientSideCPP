@@ -1,4 +1,4 @@
-import { getBuiltinTemplateComparatorSpec, isSupportedTemplateTypeName } from "@/stdlib/registry";
+import { getBuiltinTemplateComparatorSpec, isSupportedTemplateTypeName } from "@/stdlib/metadata";
 import type {
   AddressOfExprNode,
   AssignExprNode,

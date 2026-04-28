@@ -1,7 +1,7 @@
 import type { RuntimeValue } from "@/runtime/value";
 import type { EvalCtx } from "@/stdlib/eval-context";
 import { registerFreeCall } from "@/stdlib/eval-registry";
-import { describeBuiltinArity, getBuiltinTemplateFactorySpec } from "@/stdlib/registry";
+import { describeBuiltinArity, getBuiltinTemplateFactorySpec } from "@/stdlib/metadata";
 import type { ExprNode } from "@/types";
 import { pairType, tupleType } from "@/types";
 
