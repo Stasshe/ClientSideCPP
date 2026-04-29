@@ -49,6 +49,9 @@ export function checkVectorMethod(
     ctx.validateExpr(args[0] ?? null, vectorElementType(receiverType));
   } else if (method === "resize") {
     ctx.validateExpr(args[0] ?? null, "int");
+    if (args.length >= 2) {
+      ctx.validateExpr(args[1] ?? null, vectorElementType(receiverType));
+    }
   }
 
   switch (vecSpec.returns) {

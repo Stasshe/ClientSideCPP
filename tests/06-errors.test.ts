@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compileAndRun } from "./test-helper";
+import { compile, compileAndRun } from "./test-helper";
 
 describe("Error Handling", () => {
   it("uninitialized variable read is runtime error", () => {
@@ -135,6 +135,31 @@ int main() {
     const result = compileAndRun(source);
     expect(result.status).toBe("error");
     expect(result.error?.message).toMatch(/Runtime Error:/);
+  });
+
+  it("vector resize rejects too many arguments", () => {
+    const result = compile(`
+int main() {
+  vector<int> v;
+  v.resize(1, 2, 3);
+  return 0;
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected compile error");
+    expect(result.errors[0]?.message).toMatch(/resize requires 1 or 2 arguments/);
+  });
+
+  it("vector resize validates fill value type", () => {
+    const result = compile(`
+int main() {
+  vector<int> v;
+  v.resize(2, "x");
+  return 0;
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected compile error");
   });
 
   it("break outside loop is compile error", () => {

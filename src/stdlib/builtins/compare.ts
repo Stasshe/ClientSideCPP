@@ -62,7 +62,6 @@ export function compareValues(
     case "reference":
       return fail("reference comparison is not supported", line);
   }
-  return fail("unsupported comparison", line);
 }
 
 export function compareSortableValues(
@@ -72,15 +71,42 @@ export function compareSortableValues(
   line: number,
   fail: FailFn,
 ): number {
+  const result = compareSortable(left, right, line, fail);
+  return descending ? -result : result;
+}
+
+function compareSortable(
+  left: RuntimeValue,
+  right: RuntimeValue,
+  line: number,
+  fail: FailFn,
+): number {
+  if (left.kind === "object" && left.objectKind === "pair") {
+    if (right.kind !== "object" || right.objectKind !== "pair") {
+      fail("type mismatch in pair sort", line);
+    }
+    const firstCmp = compareSortable(left.first, right.first, line, fail);
+    if (firstCmp !== 0) return firstCmp;
+    return compareSortable(left.second, right.second, line, fail);
+  }
+  if (left.kind === "object" && left.objectKind === "tuple") {
+    if (right.kind !== "object" || right.objectKind !== "tuple") {
+      fail("type mismatch in tuple sort", line);
+    }
+    for (let i = 0; i < left.values.length; i++) {
+      const lv = left.values[i];
+      const rv = right.values[i];
+      if (lv === undefined || rv === undefined) break;
+      const cmp = compareSortable(lv, rv, line, fail);
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  }
   const leftValue = sortablePrimitive(left, line, fail);
   const rightValue = sortablePrimitive(right, line, fail);
-  let result = 0;
-  if (leftValue < rightValue) {
-    result = -1;
-  } else if (leftValue > rightValue) {
-    result = 1;
-  }
-  return descending ? -result : result;
+  if (leftValue < rightValue) return -1;
+  if (leftValue > rightValue) return 1;
+  return 0;
 }
 
 export function sameLocation(left: RuntimeLocation | null, right: RuntimeLocation | null): boolean {
@@ -123,7 +149,6 @@ export function sameLocation(left: RuntimeLocation | null, right: RuntimeLocatio
         sameLocation(left.parent, right.parent)
       );
   }
-  return false;
 }
 
 export function isNumericRuntimeValue(

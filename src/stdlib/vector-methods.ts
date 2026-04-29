@@ -27,7 +27,7 @@ const VECTOR_METHOD_SPECS: Record<VectorMethodName, VectorMethodSpec> = {
   back: { name: "back", minArgs: 0, maxArgs: 0, returns: "element" },
   empty: { name: "empty", minArgs: 0, maxArgs: 0, returns: "bool" },
   clear: { name: "clear", minArgs: 0, maxArgs: 0, returns: "void" },
-  resize: { name: "resize", minArgs: 1, maxArgs: 1, returns: "void" },
+  resize: { name: "resize", minArgs: 1, maxArgs: 2, returns: "void" },
 };
 
 export function getVectorMethodSpec(name: string): VectorMethodSpec | null {
@@ -41,5 +41,9 @@ export function isVectorMethodName(name: string): name is VectorMethodName {
 export function describeVectorMethodArgs(spec: VectorMethodSpec): string {
   if (spec.maxArgs === 0) return "no arguments";
   if (spec.minArgs === spec.maxArgs && spec.minArgs === 1) return "exactly 1 argument";
-  return `exactly ${spec.minArgs.toString()} arguments`;
+  if (spec.minArgs === spec.maxArgs) return `exactly ${spec.minArgs.toString()} arguments`;
+  if (spec.minArgs + 1 === spec.maxArgs) {
+    return `${spec.minArgs.toString()} or ${spec.maxArgs.toString()} arguments`;
+  }
+  return `${spec.minArgs.toString()} to ${spec.maxArgs.toString()} arguments`;
 }

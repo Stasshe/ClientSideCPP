@@ -11,6 +11,23 @@ import {
 import type { ExprNode, VectorTypeNode } from "@/types";
 import { isVectorType, iteratorType, vectorType } from "@/types";
 
+function cloneValue(value: RuntimeValue, ctx: EvalCtx): RuntimeValue {
+  if (value.kind === "object") {
+    if (value.objectKind === "vector") {
+      const orig = ctx.arrays.get(value.ref);
+      if (orig === undefined) return value;
+      return ctx.allocVector(value.type, orig.values.map((v) => cloneValue(v, ctx)));
+    }
+    if (value.objectKind === "pair") {
+      return { ...value, first: cloneValue(value.first, ctx), second: cloneValue(value.second, ctx) };
+    }
+    if (value.objectKind === "tuple") {
+      return { ...value, values: value.values.map((v) => cloneValue(v, ctx)) };
+    }
+  }
+  return value;
+}
+
 export function evalVectorConstructor(
   type: VectorTypeNode,
   args: RuntimeValue[],
@@ -27,8 +44,8 @@ export function evalVectorConstructor(
   } else if (args.length === 2) {
     const size = ctx.expectInt(args[0] as RuntimeValue, line).value;
     if (size < 0n) ctx.fail("vector size must be non-negative", line);
-    const fillValue = ctx.castToElementType(args[1] as RuntimeValue, vectorElementType(type), line);
-    values = Array.from({ length: Number(size) }, () => fillValue);
+    const proto = ctx.castToElementType(args[1] as RuntimeValue, vectorElementType(type), line);
+    values = Array.from({ length: Number(size) }, () => cloneValue(proto, ctx));
   } else if (args.length > 2) {
     ctx.fail("too many arguments for vector constructor", line);
   }
@@ -136,8 +153,21 @@ function applyMethod(
       if (targetSize < vStore.values.length) {
         vStore.values = vStore.values.slice(0, targetSize);
       } else {
+        const fillArg = args[1] as ExprNode | undefined;
+        const fillProto =
+          fillArg !== undefined
+            ? ctx.castToElementType(
+                ctx.evaluateExpr(fillArg),
+                vectorElementType(vStore.type),
+                line,
+              )
+            : null;
         while (vStore.values.length < targetSize) {
-          vStore.values.push(ctx.defaultValueForType(vectorElementType(vStore.type), line));
+          vStore.values.push(
+            fillProto !== null
+              ? cloneValue(fillProto, ctx)
+              : ctx.defaultValueForType(vectorElementType(vStore.type), line),
+          );
         }
       }
       return { kind: "void" };
