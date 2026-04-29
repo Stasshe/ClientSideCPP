@@ -176,4 +176,23 @@ int main() {
     expect(result.status).toBe("done");
     expect(result.output.stdout).toBe("7 7\n");
   });
+
+  it("resets template parameter scope after malformed template declaration", () => {
+    const result = compile(`
+template<typename T>
+int (T x) {
+  return 0;
+}
+
+int main() {
+  T y = 1;
+  return y;
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("expected compile error");
+    }
+    expect(result.errors.some((error) => error.message.includes("expected ';' after expression"))).toBe(true);
+  });
 });

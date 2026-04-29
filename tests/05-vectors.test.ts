@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compileAndRun } from "./test-helper";
+import { compile, compileAndRun } from "./test-helper";
 
 describe("Vectors", () => {
   it("vector empty constructor", () => {
@@ -290,5 +290,33 @@ int main() {
     const result = compileAndRun(source);
     expect(result.status).toBe("done");
     expect(result.output.stdout).toBe("7\n7\n7\n");
+  });
+
+  it("fill clones nested vector values", () => {
+    const source = `
+int main() {
+  vector<vector<int>> rows(2, vector<int>(2, 0));
+  fill(rows.begin(), rows.end(), vector<int>(2, 9));
+  rows[0][0] = 1;
+  cout << rows[0][0] << " " << rows[1][0] << "\\n";
+  return 0;
+}
+`;
+    const result = compileAndRun(source);
+    expect(result.status).toBe("done");
+    expect(result.output.stdout).toBe("1 9\n");
+  });
+
+  it("sort rejects non-full vector range at compile time", () => {
+    const result = compile(`
+int main() {
+  vector<int> v(3, 0);
+  sort(v.end(), v.end());
+  return 0;
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected compile error");
+    expect(result.errors[0]?.message).toMatch(/full vector range/);
   });
 });

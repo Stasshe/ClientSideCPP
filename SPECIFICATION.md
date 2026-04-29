@@ -502,7 +502,7 @@ cerr << "debug: " << x << "\n";
 - `swap` の引数は lvalue（変数または添字アクセス）でなければならない
 - `make_pair` はちょうど 2 引数、`make_tuple` は 1 引数以上を要求する
 - `sort` / `reverse` / `fill` は `vector` に対する完全範囲 `v.begin(), v.end()` のみ対応し、`begin()` / `end()` が返す内部 iterator を通じて range を扱う
-- `sort` の comparator は `greater<int>()` と `greater<>()` に対応する。後者は前処理段階で `greater<int>()` に正規化する
+- `sort` の comparator は `greater<int>()` と `greater<>()` に対応する
 - `greater<int>()` / `greater<>()` は stdlib template-call として受理し、降順 comparator として扱う
 - `get<I>(x)` は stdlib template-call として受理し、tuple 要素アクセスとして扱う
 - `vector.begin()` / `vector.end()` は method metadata で扱い、返り値は内部 iterator

@@ -1,6 +1,7 @@
 import type { RuntimeValue } from "@/runtime/value";
 import type { EvalCtx } from "@/stdlib/eval-context";
 import { registerMethodHandler, registerTemplateCall } from "@/stdlib/eval-registry";
+import { cloneRuntimeValue } from "@/stdlib/runtime-values";
 import { getSingleTypeTemplateArg } from "@/stdlib/template-exprs";
 import { vectorElementType } from "@/stdlib/template-types";
 import {
@@ -10,23 +11,6 @@ import {
 } from "@/stdlib/vector-methods";
 import type { ExprNode, VectorTypeNode } from "@/types";
 import { isVectorType, iteratorType, vectorType } from "@/types";
-
-function cloneValue(value: RuntimeValue, ctx: EvalCtx): RuntimeValue {
-  if (value.kind === "object") {
-    if (value.objectKind === "vector") {
-      const orig = ctx.arrays.get(value.ref);
-      if (orig === undefined) return value;
-      return ctx.allocVector(value.type, orig.values.map((v) => cloneValue(v, ctx)));
-    }
-    if (value.objectKind === "pair") {
-      return { ...value, first: cloneValue(value.first, ctx), second: cloneValue(value.second, ctx) };
-    }
-    if (value.objectKind === "tuple") {
-      return { ...value, values: value.values.map((v) => cloneValue(v, ctx)) };
-    }
-  }
-  return value;
-}
 
 export function evalVectorConstructor(
   type: VectorTypeNode,
@@ -45,7 +29,7 @@ export function evalVectorConstructor(
     const size = ctx.expectInt(args[0] as RuntimeValue, line).value;
     if (size < 0n) ctx.fail("vector size must be non-negative", line);
     const proto = ctx.castToElementType(args[1] as RuntimeValue, vectorElementType(type), line);
-    values = Array.from({ length: Number(size) }, () => cloneValue(proto, ctx));
+    values = Array.from({ length: Number(size) }, () => cloneRuntimeValue(proto, ctx));
   } else if (args.length > 2) {
     ctx.fail("too many arguments for vector constructor", line);
   }
@@ -165,7 +149,7 @@ function applyMethod(
         while (vStore.values.length < targetSize) {
           vStore.values.push(
             fillProto !== null
-              ? cloneValue(fillProto, ctx)
+              ? cloneRuntimeValue(fillProto, ctx)
               : ctx.defaultValueForType(vectorElementType(vStore.type), line),
           );
         }

@@ -27,7 +27,7 @@
 - `TemplateCallExpr`
 - `TemplateFunctionDecl`
 
-ただし一般の `foo<int>` を広く受理する段階には達していない。現状の `TemplateIdExpr` は主に `vector` / `map` / `pair` / `tuple` / `get` / `greater` 向けで、ユーザー定義関数テンプレートの明示型引数呼び出し `f<int>(x)` は未対応。
+ただし一般の `foo<int>` を広く受理する段階には達していない。現状の `TemplateIdExpr` は主に `vector` / `map` / `pair` / `tuple` / `get` / `greater` と、限定的なユーザー定義関数テンプレートの明示型引数呼び出し `f<int>(x)` を支えるための土台として使っている。
 
 ### Phase 3: Symbol Table And Instantiation
 
@@ -41,7 +41,6 @@
 - 明示特殊化
 - 部分特殊化
 - オーバーロード解決
-- 明示テンプレート実引数呼び出し
 
 ### Phase 4: Stdlib As Definitions
 

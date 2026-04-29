@@ -88,7 +88,126 @@ function validateVectorRangeArgs(
     ctx.pushError(line, col, `${callee} requires a vector range`);
     return null;
   }
+  if (isDistinctVectorRange(beginExpr as ExprNode, endExpr as ExprNode)) {
+    ctx.pushError(line, col, `${callee} requires iterators from the same vector`);
+    return null;
+  }
+  if (!isFullVectorRange(beginExpr as ExprNode, endExpr as ExprNode)) {
+    ctx.pushError(line, col, `${callee} currently requires the full vector range`);
+    return null;
+  }
   return beginContainerType;
+}
+
+function isDistinctVectorRange(beginExpr: ExprNode, endExpr: ExprNode): boolean {
+  return (
+    beginExpr.kind === "MethodCallExpr" &&
+    beginExpr.method === "begin" &&
+    beginExpr.args.length === 0 &&
+    endExpr.kind === "MethodCallExpr" &&
+    endExpr.method === "end" &&
+    endExpr.args.length === 0 &&
+    !sameExpr(beginExpr.receiver, endExpr.receiver)
+  );
+}
+
+function isFullVectorRange(beginExpr: ExprNode, endExpr: ExprNode): boolean {
+  return (
+    beginExpr.kind === "MethodCallExpr" &&
+    beginExpr.method === "begin" &&
+    beginExpr.args.length === 0 &&
+    endExpr.kind === "MethodCallExpr" &&
+    endExpr.method === "end" &&
+    endExpr.args.length === 0 &&
+    sameExpr(beginExpr.receiver, endExpr.receiver)
+  );
+}
+
+function sameExpr(left: ExprNode, right: ExprNode): boolean {
+  if (left.kind !== right.kind) return false;
+  switch (left.kind) {
+    case "Identifier":
+      return right.kind === "Identifier" && left.name === right.name;
+    case "Literal":
+      return (
+        right.kind === "Literal" &&
+        left.valueType === right.valueType &&
+        left.value === right.value
+      );
+    case "TemplateIdExpr":
+      return (
+        right.kind === "TemplateIdExpr" &&
+        left.template === right.template &&
+        JSON.stringify(left.templateArgs) === JSON.stringify(right.templateArgs)
+      );
+    case "CallExpr":
+      return (
+        right.kind === "CallExpr" &&
+        left.callee === right.callee &&
+        sameExprList(left.args, right.args)
+      );
+    case "TemplateCallExpr":
+      return (
+        right.kind === "TemplateCallExpr" &&
+        sameExpr(left.callee, right.callee) &&
+        sameExprList(left.args, right.args)
+      );
+    case "MemberAccessExpr":
+      return (
+        right.kind === "MemberAccessExpr" &&
+        left.member === right.member &&
+        sameExpr(left.receiver, right.receiver)
+      );
+    case "MethodCallExpr":
+      return (
+        right.kind === "MethodCallExpr" &&
+        left.method === right.method &&
+        sameExpr(left.receiver, right.receiver) &&
+        sameExprList(left.args, right.args)
+      );
+    case "IndexExpr":
+      return (
+        right.kind === "IndexExpr" &&
+        sameExpr(left.target, right.target) &&
+        sameExpr(left.index, right.index)
+      );
+    case "UnaryExpr":
+      return (
+        right.kind === "UnaryExpr" &&
+        left.operator === right.operator &&
+        left.isPostfix === right.isPostfix &&
+        sameExpr(left.operand, right.operand)
+      );
+    case "AddressOfExpr":
+      return right.kind === "AddressOfExpr" && sameExpr(left.target, right.target);
+    case "DerefExpr":
+      return right.kind === "DerefExpr" && sameExpr(left.pointer, right.pointer);
+    case "BinaryExpr":
+      return (
+        right.kind === "BinaryExpr" &&
+        left.operator === right.operator &&
+        sameExpr(left.left, right.left) &&
+        sameExpr(left.right, right.right)
+      );
+    case "ConditionalExpr":
+      return (
+        right.kind === "ConditionalExpr" &&
+        sameExpr(left.condition, right.condition) &&
+        sameExpr(left.thenExpr, right.thenExpr) &&
+        sameExpr(left.elseExpr, right.elseExpr)
+      );
+    case "AssignExpr":
+      return (
+        right.kind === "AssignExpr" &&
+        left.operator === right.operator &&
+        sameExpr(left.target, right.target) &&
+        sameExpr(left.value, right.value)
+      );
+  }
+}
+
+function sameExprList(left: ExprNode[], right: ExprNode[]): boolean {
+  return left.length === right.length && left.every((expr, index) => sameExpr(expr, right[index] as ExprNode));
 }
 
 registerFreeCall("sort", checkSort);

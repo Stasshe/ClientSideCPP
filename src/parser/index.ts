@@ -164,55 +164,56 @@ class Parser extends ExpressionParser {
 
     this.activeTypeParams = typeParams;
 
-    if (!this.checkTypeStart()) {
+    try {
+      if (!this.checkTypeStart()) {
+        this.errorAtCurrent("expected return type after template parameter list");
+        return null;
+      }
+      const returnType = this.parseTypeSpecifier();
+      if (returnType === null) {
+        return null;
+      }
+
+      let functionType = returnType;
+      let cursor = this.index;
+      while (this.tokens[cursor]?.kind === "symbol" && this.tokens[cursor]?.text === "*") {
+        functionType = pointerType(functionType);
+        cursor += 1;
+      }
+      if (this.tokens[cursor]?.kind === "symbol" && this.tokens[cursor]?.text === "&") {
+        functionType = referenceType(functionType);
+        cursor += 1;
+      }
+
+      const nameToken = this.tokens[cursor];
+      if (nameToken?.kind !== "identifier") {
+        this.errorAtCurrent("expected function name");
+        return null;
+      }
+      const afterName = this.tokens[cursor + 1];
+      if (afterName?.kind !== "symbol" || afterName.text !== "(") {
+        this.errorAtCurrent("expected '(' after function name");
+        return null;
+      }
+
+      this.index = cursor;
+      this.advance(); // name
+      this.advance(); // (
+      const params = this.parseParams();
+      const body = this.parseRequiredBlock("expected block after function signature");
+      if (body === null) return null;
+
+      return {
+        kind: "TemplateFunctionDecl",
+        typeParams,
+        returnType: functionType,
+        name: nameToken.text,
+        params,
+        body,
+        ...this.rangeFromNode(startToken, body),
+      };
+    } finally {
       this.activeTypeParams = [];
-      this.errorAtCurrent("expected return type after template parameter list");
-      return null;
     }
-    const returnType = this.parseTypeSpecifier();
-    if (returnType === null) {
-      this.activeTypeParams = [];
-      return null;
-    }
-
-    let functionType = returnType;
-    let cursor = this.index;
-    while (this.tokens[cursor]?.kind === "symbol" && this.tokens[cursor]?.text === "*") {
-      functionType = pointerType(functionType);
-      cursor += 1;
-    }
-    if (this.tokens[cursor]?.kind === "symbol" && this.tokens[cursor]?.text === "&") {
-      functionType = referenceType(functionType);
-      cursor += 1;
-    }
-
-    const nameToken = this.tokens[cursor];
-    if (nameToken?.kind !== "identifier") {
-      this.errorAtCurrent("expected function name");
-      return null;
-    }
-    const afterName = this.tokens[cursor + 1];
-    if (afterName?.kind !== "symbol" || afterName.text !== "(") {
-      this.errorAtCurrent("expected '(' after function name");
-      return null;
-    }
-
-    this.index = cursor;
-    this.advance(); // name
-    this.advance(); // (
-    const params = this.parseParams();
-    const body = this.parseRequiredBlock("expected block after function signature");
-    this.activeTypeParams = [];
-    if (body === null) return null;
-
-    return {
-      kind: "TemplateFunctionDecl",
-      typeParams,
-      returnType: functionType,
-      name: nameToken.text,
-      params,
-      body,
-      ...this.rangeFromNode(startToken, body),
-    };
   }
 }

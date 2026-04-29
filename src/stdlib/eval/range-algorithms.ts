@@ -2,6 +2,7 @@ import type { RuntimeValue } from "@/runtime/value";
 import { compareSortableValues } from "@/stdlib/builtins/compare";
 import type { EvalCtx } from "@/stdlib/eval-context";
 import { registerFreeCall } from "@/stdlib/eval-registry";
+import { cloneRuntimeValue } from "@/stdlib/runtime-values";
 import { isValidBuiltinTemplateComparatorCall } from "@/stdlib/template-exprs";
 import { vectorElementType } from "@/stdlib/template-types";
 import type { ExprNode, VectorTypeNode } from "@/types";
@@ -29,7 +30,7 @@ export function evalFill(args: ExprNode[], line: number, ctx: EvalCtx): void {
     vectorElementType(store.type),
     line,
   );
-  store.values = store.values.map(() => fillValue);
+  store.values = store.values.map(() => cloneRuntimeValue(fillValue, ctx));
 }
 
 function expectVectorRange(

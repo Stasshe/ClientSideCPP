@@ -238,5 +238,5 @@ function sortablePrimitive(
   ) {
     return value.value;
   }
-  fail("sort/reverse/fill supports only primitive vector values", line);
+  fail("sort supports only primitive, pair, and tuple vector values", line);
 }
