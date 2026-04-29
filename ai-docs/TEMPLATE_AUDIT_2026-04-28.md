@@ -90,9 +90,9 @@
 `semantic/builtin-checker.ts` と `interpreter/builtin-eval.ts` は薄いディスパッチャに変更。
 `EvalCtx` / `CheckCtx` インターフェースで循環依存を回避。
 
-### 3. Explicit template arguments are still unsupported
+### 3. ~~Explicit template arguments are still unsupported~~ (解消済み)
 
-`f<int>(x)` が通らない。現状のサポート境界は「宣言は template、呼び出しは型推論のみ」。
+明示的テンプレート引数付き呼び出しはサポート済み。`f<int>(x)` のような explicit template-call syntax については `SPECIFICATION.md` の現行仕様を参照。
 
 ## Non-template Existing Issues From `main`
 
