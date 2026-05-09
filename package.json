@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "type": "module",
   "description": "ts interpreter for a competitive-programming-focused C++ subset, with AST-level step execution, full state inspection, and GCC/Clang-style diagnostics.",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@11.0.9",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
