@@ -1,4 +1,5 @@
 import type { RuntimeLocation, RuntimeValue } from "@/runtime/value";
+  import { sameLocation } from "@/runtime/value";
 
 export type FailFn = (message: string, line: number) => never;
 
@@ -118,48 +119,6 @@ function compareSortable(
   if (leftValue < rightValue) return -1;
   if (leftValue > rightValue) return 1;
   return 0;
-}
-
-export function sameLocation(left: RuntimeLocation | null, right: RuntimeLocation | null): boolean {
-  if (left === null || right === null) {
-    return left === right;
-  }
-  if (left.kind !== right.kind) {
-    return false;
-  }
-  switch (left.kind) {
-    case "binding":
-      return right.kind === "binding" && left.scope === right.scope && left.name === right.name;
-    case "array":
-      return right.kind === "array" && left.ref === right.ref && left.index === right.index;
-    case "object":
-      if (right.kind !== "object" || left.objectKind !== right.objectKind) {
-        return false;
-      }
-      if (left.objectKind === "tuple") {
-        if (right.objectKind !== "tuple") {
-          return false;
-        }
-        return left.index === right.index && sameLocation(left.parent, right.parent);
-      }
-      if (left.objectKind === "map") {
-        if (right.objectKind !== "map") {
-          return false;
-        }
-        return (
-          left.entryIndex === right.entryIndex &&
-          left.access === right.access &&
-          sameLocation(left.parent, right.parent)
-        );
-      }
-      return false;
-    case "string":
-      return (
-        right.kind === "string" &&
-        left.index === right.index &&
-        sameLocation(left.parent, right.parent)
-      );
-  }
 }
 
 export function isNumericRuntimeValue(

@@ -1,8 +1,8 @@
 import type { RuntimeValue } from "@/runtime/value";
+import { sameLocation } from "@/runtime/value";
 import {
   compareSortableValues,
   compareValues,
-  sameLocation,
   toNumericOperands,
 } from "@/stdlib/builtins/compare";
 import {

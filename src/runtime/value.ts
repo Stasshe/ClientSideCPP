@@ -88,6 +88,46 @@ export function uninitializedForType(type: PrimitiveTypeNode): RuntimeValue {
   return { kind: "uninitialized", expectedType: type };
 }
 
+export function sameLocation(left: RuntimeLocation | null, right: RuntimeLocation | null): boolean {
+  if (left === null || right === null) {
+    return left === right;
+  }
+  if (left.kind !== right.kind) {
+    return false;
+  }
+  switch (left.kind) {
+    case "binding":
+      return right.kind === "binding" && left.scope === right.scope && left.name === right.name;
+    case "array":
+      return right.kind === "array" && left.ref === right.ref && left.index === right.index;
+    case "object":
+      if (right.kind !== "object" || left.objectKind !== right.objectKind) {
+        return false;
+      }
+      if (left.objectKind === "pair") {
+        return right.objectKind === "pair" && left.member === right.member && sameLocation(left.parent, right.parent);
+      }
+      if (left.objectKind === "tuple") {
+        return right.objectKind === "tuple" && left.index === right.index && sameLocation(left.parent, right.parent);
+      }
+      if (left.objectKind === "map") {
+        return (
+          right.objectKind === "map" &&
+          left.entryIndex === right.entryIndex &&
+          left.access === right.access &&
+          sameLocation(left.parent, right.parent)
+        );
+      }
+      return false;
+    case "string":
+      return (
+        right.kind === "string" &&
+        left.index === right.index &&
+        sameLocation(left.parent, right.parent)
+      );
+  }
+}
+
 export type OutputFormat = {
   fixed: boolean;
   precision: number | null;

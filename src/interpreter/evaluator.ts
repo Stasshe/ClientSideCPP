@@ -1,9 +1,9 @@
 import type { RuntimeLocation, RuntimeValue } from "@/runtime/value";
+import { sameLocation } from "@/runtime/value";
 import { inferTypeArgs, instantiateFunction } from "@/semantic/template-instantiator";
 import {
   compareSortableValues,
   compareValues,
-  sameLocation,
   toNumericOperands,
 } from "@/stdlib/builtins/compare";
 import type { EvalCtx } from "@/stdlib/eval-context";

@@ -41,7 +41,10 @@
 | `char` | JS `string` | 長さ 1 の Unicode 文字 |
 | `string` | JS `string` | cin/cout での入出力に使用 |
 
-- `int` と `long long` は同一の内部型として扱う。オーバーフロー検査や 64bit 範囲制約は行わない
+- `int` と `long long` は同一の内部型（JS `BigInt`）として扱う。オーバーフロー検査や 64bit 範囲制約は行わない
+- 型の等価性チェックでは `int` と `long long` は同一とみなす（テンプレート引数・代入・関数引数など）
+- 算術演算・bit 演算・シフト演算・単項 `-`・`~`・三項演算子の結果型は、いずれかのオペランドが `long long` なら `long long`、そうでなければ `int` を返す（型伝播）
+- `++` / `--` 演算子の結果型も同様に演算対象の型を保持する
 - `char` は長さ 1 の文字として保持するが、数値演算・比較では整数型としても扱える
 - `int` / `long long` と `double` の間では数値演算・代入・引数受け渡し・三項演算子の共通型解決で暗黙変換を許可する
 - `char` と `int` / `long long` / `double` の間では数値演算・代入・引数受け渡し・三項演算子の共通型解決で暗黙変換を許可する
@@ -72,7 +75,9 @@ r = 7;
 - 実装範囲の明確化：`p - q` は「同一配列」または「同一文字列」のときのみ定義し、異なるオブジェクト間の差分は実行時エラー
 - `&expr` は lvalue に対してのみ使用可能
 - `*ptr` は pointer に対してのみ使用可能。null ポインタ参照は実行時エラー
-- `0` と `nullptr` は null pointer constant として扱う
+- `nullptr` はキーワードとして字句解析・構文解析される。実行時には `void*` 型の null pointer value として評価される
+- `0` も null pointer constant として扱う。ポインタとの `==` / `!=` 比較では `0` リテラルを null pointer とみなす
+- `nullptr` と null pointer constant `0` は `==` で等しい
 - `T&` の変数は宣言時初期化が必須
 - `vector<T&>` や `T& a[10]` のような「要素型が参照」のコンテナは非対応
 - 関数の戻り値として pointer は許可、reference は非対応
