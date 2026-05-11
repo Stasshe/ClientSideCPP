@@ -12,7 +12,6 @@ import type {
   RunResult,
   RuntimeErrorInfo,
   StatementNode,
-  TemplateFunctionDeclNode,
 } from "@/types";
 import { isVectorType, pairType } from "@/types";
 import type { RuntimeArgument } from "./evaluator";
@@ -328,6 +327,9 @@ class Interpreter extends InterpreterEvaluator {
           this.inputIndex += 1;
           this.assignFromInput(target, token, stmt.line);
           this.step(target, "expression");
+        }
+        for (const expr of stmt.trailingExprs) {
+          this.evaluateExpr(expr);
         }
         return;
     }

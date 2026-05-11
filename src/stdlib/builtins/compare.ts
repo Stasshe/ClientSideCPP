@@ -1,5 +1,5 @@
 import type { RuntimeLocation, RuntimeValue } from "@/runtime/value";
-  import { sameLocation } from "@/runtime/value";
+import { sameLocation } from "@/runtime/value";
 
 export type FailFn = (message: string, line: number) => never;
 

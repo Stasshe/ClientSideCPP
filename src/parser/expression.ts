@@ -609,7 +609,10 @@ export abstract class ExpressionParser extends BaseParser {
           depth += 1;
         } else if (token.text === ")" || token.text === "]") {
           depth = Math.max(0, depth - 1);
-        } else if (depth === 0 && (token.text === symbol || token.text === ";")) {
+        } else if (
+          depth === 0 &&
+          (token.text === symbol || token.text === ";" || token.text === ",")
+        ) {
           return cursor;
         }
       }

@@ -2,11 +2,8 @@ import type {
   ArrayDeclNode,
   AssignTargetNode,
   BlockStmtNode,
-  CinStmtNode,
-  CoutStmtNode,
   DeclGroupStmtNode,
   ExprNode,
-  ExprStmtNode,
   ForInitNode,
   ForStmtNode,
   FunctionDeclNode,
@@ -98,7 +95,11 @@ function substituteStmt(stmt: StatementNode, map: TypeArgMap): StatementNode {
     case "CerrStmt":
       return { ...stmt, values: stmt.values.map((e) => substituteExpr(e, map)) };
     case "CinStmt":
-      return { ...stmt, targets: stmt.targets.map((t) => substituteAssignTarget(t, map)) };
+      return {
+        ...stmt,
+        targets: stmt.targets.map((t) => substituteAssignTarget(t, map)),
+        trailingExprs: stmt.trailingExprs.map((e) => substituteExpr(e, map)),
+      };
     case "BreakStmt":
     case "ContinueStmt":
       return stmt;

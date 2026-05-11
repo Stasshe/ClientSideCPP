@@ -250,6 +250,9 @@ function validateStatement(stmt: StatementNode, context: ValidationContext): voi
           pushError(context, target.line, target.col, "invalid cin target");
         }
       }
+      for (const expr of stmt.trailingExprs) {
+        validateExpr(expr, context);
+      }
       return;
   }
 }

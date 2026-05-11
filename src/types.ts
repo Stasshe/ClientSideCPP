@@ -227,6 +227,7 @@ export type CerrStmtNode = NodeBase & {
 export type CinStmtNode = NodeBase & {
   kind: "CinStmt";
   targets: AssignTargetNode[];
+  trailingExprs: ExprNode[];
 };
 
 export type CastExprNode = NodeBase & {

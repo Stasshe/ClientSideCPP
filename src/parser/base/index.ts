@@ -15,6 +15,28 @@ export abstract class BaseParser extends BaseParserSupport {
       return this.parseRequiredBlock("expected block");
     }
 
+    // Handle using declarations inside function bodies
+    if (this.checkKeyword("using")) {
+      this.advance();
+      const next = this.peek();
+      const afterNext = this.tokens[this.index + 1];
+      if (next.kind === "identifier" && afterNext?.kind === "symbol" && afterNext.text === "=") {
+        const aliasName = next.text;
+        this.advance(); // name
+        this.advance(); // =
+        const aliasedType = this.parseType();
+        if (aliasedType !== null) {
+          this.typeAliasMap.set(aliasName, aliasedType);
+        }
+        this.consumeSymbol(";", "expected ';' after using declaration");
+      } else {
+        // using namespace ...; — skip
+        while (!this.checkSymbol(";") && !this.isAtEnd()) this.advance();
+        this.matchSymbol(";");
+      }
+      return this.parseStatement();
+    }
+
     if (this.checkTypeStart()) {
       const type = this.parseTypeSpecifier();
       if (type === null) {
@@ -215,10 +237,14 @@ export abstract class BaseParser extends BaseParserSupport {
         }
         targets.push(expr);
       }
+      const trailingExprs: ExprNode[] = [];
+      while (this.matchSymbol(",")) {
+        trailingExprs.push(this.parseExpression());
+      }
       if (!this.consumeSymbol(";", "expected ';' after cin statement")) {
         return null;
       }
-      return { kind: "CinStmt", targets, ...this.rangeToPrevious(token) };
+      return { kind: "CinStmt", targets, trailingExprs, ...this.rangeToPrevious(token) };
     }
 
     if (this.isUnsupportedTemplateTypeDeclarationStart()) {

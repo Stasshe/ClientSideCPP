@@ -13,7 +13,7 @@ import type {
   TypeNode,
   VarDeclNode,
 } from "@/types";
-import { isTemplateInstanceType, isVectorType } from "@/types";
+import { isPrimitiveType, isTemplateInstanceType, isVectorType } from "@/types";
 import { BaseParserTypeSupport } from "./type-support";
 
 export abstract class BaseParserSupport extends BaseParserTypeSupport {
@@ -141,6 +141,18 @@ export abstract class BaseParserSupport extends BaseParserTypeSupport {
         return null;
       }
     }
+    // Track compile-time integer constants for array dimension resolution
+    if (
+      this.lastTypeWasConst &&
+      isPrimitiveType(type) &&
+      (type.name === "int" || type.name === "long long") &&
+      initializer !== null &&
+      initializer.kind === "Literal" &&
+      typeof initializer.value === "bigint"
+    ) {
+      this.constValueMap.set(nameToken.text, initializer.value);
+    }
+
     return {
       kind: "VarDecl",
       type,

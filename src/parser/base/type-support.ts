@@ -14,7 +14,11 @@ const TYPE_KEYWORDS = new Set<string>(["int", "long", "double", "bool", "char", 
 
 export abstract class BaseParserTypeSupport extends BaseParserCore {
   protected parseType(): TypeNode | null {
+    this.lastTypeWasConst = this.matchKeyword("const");
+
     const token = this.peek();
+
+    // Template type params take priority
     if (
       token.kind === "identifier" &&
       this.activeTypeParams.length > 0 &&
@@ -23,6 +27,13 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
       this.advance();
       return { kind: "NamedType", name: token.text };
     }
+
+    // Resolve type aliases
+    if (token.kind === "identifier" && this.typeAliasMap.has(token.text)) {
+      this.advance();
+      return this.typeAliasMap.get(token.text) as TypeNode;
+    }
+
     const templateType = this.parseTemplateInstanceType();
     if (templateType !== null) {
       return templateType;
@@ -70,10 +81,13 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
   }
 
   protected override checkTypeStart(): boolean {
+    if (this.checkKeyword("const")) return true;
     if (this.peekPrimitiveTypeKeyword() || this.peekTemplateTypeName() !== null) return true;
-    if (this.activeTypeParams.length > 0) {
-      const token = this.peek();
-      return token.kind === "identifier" && this.activeTypeParams.includes(token.text);
+    const token = this.peek();
+    if (token.kind === "identifier") {
+      if (this.activeTypeParams.length > 0 && this.activeTypeParams.includes(token.text))
+        return true;
+      if (this.typeAliasMap.has(token.text)) return true;
     }
     return false;
   }
@@ -275,11 +289,21 @@ export abstract class BaseParserTypeSupport extends BaseParserCore {
         continue;
       }
 
-      const sizeToken = this.consume("number", `expected ${contextName} size integer literal`);
-      if (sizeToken === null) {
-        return null;
+      if (this.peek().kind === "identifier") {
+        const idToken = this.advance();
+        const constVal = this.constValueMap.get(idToken.text);
+        if (constVal === undefined) {
+          this.errorAt(idToken, `'${idToken.text}' is not a known integer constant`);
+          return null;
+        }
+        dimensions.push(constVal);
+      } else {
+        const sizeToken = this.consume("number", `expected ${contextName} size integer literal`);
+        if (sizeToken === null) {
+          return null;
+        }
+        dimensions.push(BigInt(sizeToken.text));
       }
-      dimensions.push(BigInt(sizeToken.text));
       if (!this.consumeSymbol("]", "expected ']' after array size")) {
         return null;
       }

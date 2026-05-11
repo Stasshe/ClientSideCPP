@@ -28,11 +28,6 @@ const RE_INCLUDE = /^\s*#\s*include\s*[<"]([^>"]+)[>"]\s*$/;
 const RE_DEFINE = /^\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)(\(([^)]*)\))?\s*(.*)/;
 const RE_ANY_DIRECTIVE = /^\s*#/;
 const RE_USING_NS_STD = /^\s*using\s+namespace\s+std\s*;\s*$/;
-const RE_USING_ALIAS = /^\s*using\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;\s*$/;
-const RE_CONST_DECL =
-  /^\s*const\s+(int|long\s+long|double|bool|char|string)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;\s*$/;
-const RE_STRIP_CONST =
-  /^\s*const\s+(?=(int|long\s+long|double|bool|char|string|vector|map|pair|tuple)\b)/;
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -61,24 +56,7 @@ export function preprocess(source: string): PreprocessResult {
       continue;
     }
 
-    const aliasMatch = expanded.match(RE_USING_ALIAS);
-    if (aliasMatch?.[1] !== undefined && aliasMatch[2] !== undefined) {
-      macros.set(aliasMatch[1], { kind: "object", name: aliasMatch[1], body: aliasMatch[2] });
-      blank();
-      continue;
-    }
-
-    const constMatch = expanded.match(RE_CONST_DECL);
-    if (constMatch?.[2] !== undefined && constMatch[3] !== undefined) {
-      const rawBody = constMatch[3];
-      // Wrap compound expressions in () to preserve operator precedence; simple literals don't need it
-      const body = /^-?\d+(\.\d+)?$/.test(rawBody) ? rawBody : `(${rawBody})`;
-      macros.set(constMatch[2], { kind: "object", name: constMatch[2], body });
-      blank();
-      continue;
-    }
-
-    output.push(expanded.replace(RE_STRIP_CONST, ""));
+    output.push(expanded);
     for (let i = 1; i < span; i++) output.push("");
   }
 
@@ -263,79 +241,7 @@ function normalizeCompatibility(line: string): string {
     return Number.isInteger(e) && e >= 0 && e <= 18 ? `${base}${"0".repeat(e)}` : _m;
   });
   s = s.replace(/\b(\d+)(ULL|ull|UL|ul|LU|lu|LL|ll|L|l|U|u)\b/g, "$1");
-  s = normalizeCinComma(s);
   return s;
-}
-
-// cin >> a, b → split at top-level comma into separate statements.
-// If inside a brace-less for-body, wrap both parts in {} to preserve loop variable scope.
-function normalizeCinComma(line: string): string {
-  const cinIdx = line.search(/\bcin\b/);
-  if (cinIdx < 0 || !line.slice(cinIdx).includes(">>")) return line;
-
-  let depth = 0;
-  let inStr = false;
-  let inChr = false;
-  let escaped = false;
-
-  for (let i = cinIdx; i < line.length; i++) {
-    const ch = line[i] ?? "";
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (ch === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (!inChr && ch === '"') {
-      inStr = !inStr;
-      continue;
-    }
-    if (!inStr && ch === "'") {
-      inChr = !inChr;
-      continue;
-    }
-    if (inStr || inChr) continue;
-    if (ch === "(" || ch === "[" || ch === "{") {
-      depth++;
-      continue;
-    }
-    if (ch === ")" || ch === "]" || ch === "}") {
-      depth = Math.max(0, depth - 1);
-      continue;
-    }
-    if (depth === 0 && ch === ",") {
-      const bodyStart = findBracelessForBody(line, cinIdx);
-      if (bodyStart !== null) {
-        return `${line.slice(0, bodyStart)}{${line.slice(bodyStart, i)};${line.slice(i + 1)}}`;
-      }
-      return `${line.slice(0, i)};${line.slice(i + 1)}`;
-    }
-  }
-  return line;
-}
-
-function findBracelessForBody(line: string, cinIdx: number): number | null {
-  const forIdx = line.search(/\bfor\s*\(/);
-  if (forIdx < 0 || forIdx > cinIdx) return null;
-  let depth = 0;
-  for (let i = forIdx; i < line.length; i++) {
-    const ch = line[i] ?? "";
-    if (ch === "(") {
-      depth++;
-      continue;
-    }
-    if (ch === ")") {
-      depth--;
-      if (depth === 0) {
-        let bodyStart = i + 1;
-        while (/\s/.test(line[bodyStart] ?? "")) bodyStart++;
-        return line[bodyStart] === "{" ? null : bodyStart;
-      }
-    }
-  }
-  return null;
 }
 
 // ── Lexer helpers ─────────────────────────────────────────────────────────────

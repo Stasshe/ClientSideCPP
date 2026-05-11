@@ -105,10 +105,18 @@ export function sameLocation(left: RuntimeLocation | null, right: RuntimeLocatio
         return false;
       }
       if (left.objectKind === "pair") {
-        return right.objectKind === "pair" && left.member === right.member && sameLocation(left.parent, right.parent);
+        return (
+          right.objectKind === "pair" &&
+          left.member === right.member &&
+          sameLocation(left.parent, right.parent)
+        );
       }
       if (left.objectKind === "tuple") {
-        return right.objectKind === "tuple" && left.index === right.index && sameLocation(left.parent, right.parent);
+        return (
+          right.objectKind === "tuple" &&
+          left.index === right.index &&
+          sameLocation(left.parent, right.parent)
+        );
       }
       if (left.objectKind === "map") {
         return (

@@ -21,9 +21,24 @@ class Parser extends ExpressionParser {
 
     while (!this.isAtEnd()) {
       if (this.matchKeyword("using")) {
+        const next = this.peek();
+        const afterNext = this.tokens[this.index + 1];
+        if (next.kind === "identifier" && afterNext?.kind === "symbol" && afterNext.text === "=") {
+          // using T = type;
+          const aliasName = next.text;
+          this.advance(); // name
+          this.advance(); // =
+          const aliasedType = this.parseType();
+          if (aliasedType !== null) {
+            this.typeAliasMap.set(aliasName, aliasedType);
+          }
+          this.consumeSymbol(";", "expected ';' after using declaration");
+          continue;
+        }
+        // using namespace std;
         const namespaceOkay = this.consumeKeyword(
           "namespace",
-          "expected 'namespace' after 'using'",
+          "expected 'namespace' or type alias after 'using'",
         );
         const namespaceName = namespaceOkay
           ? this.consumeIdentifier("expected namespace name")

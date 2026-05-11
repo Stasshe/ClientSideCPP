@@ -1,4 +1,4 @@
-import type { BlockStmtNode, CompileError, ExprNode, SourceRange, Token } from "@/types";
+import type { BlockStmtNode, CompileError, ExprNode, SourceRange, Token, TypeNode } from "@/types";
 
 export abstract class BaseParserCore {
   protected readonly tokens: Token[];
@@ -8,6 +8,12 @@ export abstract class BaseParserCore {
   protected readonly errors: CompileError[] = [];
 
   protected activeTypeParams: string[] = [];
+
+  protected readonly typeAliasMap = new Map<string, TypeNode>();
+
+  protected readonly constValueMap = new Map<string, bigint>();
+
+  protected lastTypeWasConst = false;
 
   constructor(tokens: Token[]) {
     this.tokens = tokens;

@@ -1,10 +1,6 @@
 import type { RuntimeValue } from "@/runtime/value";
 import { sameLocation } from "@/runtime/value";
-import {
-  compareSortableValues,
-  compareValues,
-  toNumericOperands,
-} from "@/stdlib/builtins/compare";
+import { compareSortableValues, compareValues, toNumericOperands } from "@/stdlib/builtins/compare";
 import {
   dispatchFreeCall,
   dispatchMethodCall,
