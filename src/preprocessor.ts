@@ -70,7 +70,10 @@ export function preprocess(source: string): PreprocessResult {
 
     const constMatch = expanded.match(RE_CONST_DECL);
     if (constMatch?.[2] !== undefined && constMatch[3] !== undefined) {
-      macros.set(constMatch[2], { kind: "object", name: constMatch[2], body: constMatch[3] });
+      const rawBody = constMatch[3];
+      // Wrap compound expressions in () to preserve operator precedence; simple literals don't need it
+      const body = /^-?\d+(\.\d+)?$/.test(rawBody) ? rawBody : `(${rawBody})`;
+      macros.set(constMatch[2], { kind: "object", name: constMatch[2], body });
       blank();
       continue;
     }
