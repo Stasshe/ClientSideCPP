@@ -1,5 +1,7 @@
 import type { CompileError } from "@/types";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 type ObjectMacro = {
   kind: "object";
   name: string;
@@ -10,101 +12,116 @@ type FunctionMacro = {
   kind: "function";
   name: string;
   params: string[];
+  variadic: boolean;
   body: string;
 };
 
 type MacroDefinition = ObjectMacro | FunctionMacro;
 
-type PreprocessResult = { ok: true; source: string } | { ok: false; errors: CompileError[] };
+type LogicalLine = { text: string; line: number; span: number };
 
-const INCLUDE_PATTERN =
-  /^\s*#\s*include\s*<(bits\/stdc\+\+\.h|algorithm|functional|iomanip|iostream|map|tuple|utility|vector)>\s*$/;
-const DEFINE_PATTERN = /^\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)(\(([^)]*)\))?\s*(.*)$/;
-const USING_ALIAS_PATTERN = /^\s*using\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;\s*$/;
-const CONST_DECL_PATTERN =
+export type PreprocessResult = { ok: true; source: string } | { ok: false; errors: CompileError[] };
+
+// ── Patterns ──────────────────────────────────────────────────────────────────
+
+const RE_INCLUDE = /^\s*#\s*include\s*[<"]([^>"]+)[>"]\s*$/;
+const RE_DEFINE = /^\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)(\(([^)]*)\))?\s*(.*)/;
+const RE_ANY_DIRECTIVE = /^\s*#/;
+const RE_USING_NS_STD = /^\s*using\s+namespace\s+std\s*;\s*$/;
+const RE_USING_ALIAS = /^\s*using\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;\s*$/;
+const RE_CONST_DECL =
   /^\s*const\s+(int|long\s+long|double|bool|char|string)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;\s*$/;
+const RE_STRIP_CONST =
+  /^\s*const\s+(?=(int|long\s+long|double|bool|char|string|vector|map|pair|tuple)\b)/;
+
+// ── Public API ────────────────────────────────────────────────────────────────
 
 export function preprocess(source: string): PreprocessResult {
   const macros = new Map<string, MacroDefinition>();
   const errors: CompileError[] = [];
-  const lines = source.split("\n");
+  const logical = joinContinuationLines(source.split("\n"));
   const output: string[] = [];
 
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
-    const lineNo = lineIndex + 1;
-    const line = lines[lineIndex] ?? "";
-    const trimmed = line.trimStart();
+  for (const { text, line, span } of logical) {
+    const blank = () => {
+      for (let i = 0; i < span; i++) output.push("");
+    };
 
-    if (!trimmed.startsWith("#")) {
-      const expanded = expandLine(line, macros, lineNo, errors);
-      const normalized = normalizeCinCommaStatement(normalizeCompatibilitySyntax(expanded));
-      const usingAlias = normalized.match(USING_ALIAS_PATTERN);
-      if (usingAlias !== null) {
-        const name = usingAlias[1];
-        const body = usingAlias[2];
-        if (name !== undefined && body !== undefined) {
-          macros.set(name, { kind: "object", name, body });
-          output.push("");
-          continue;
-        }
-      }
-      const constDecl = normalized.match(CONST_DECL_PATTERN);
-      if (constDecl !== null) {
-        const name = constDecl[2];
-        const body = constDecl[3];
-        if (name !== undefined && body !== undefined) {
-          macros.set(name, { kind: "object", name, body });
-          output.push("");
-          continue;
-        }
-      }
-      output.push(stripConstKeyword(normalized));
+    if (text.trimStart().startsWith("#")) {
+      processDirective(text, line, macros, errors);
+      blank();
       continue;
     }
 
-    if (INCLUDE_PATTERN.test(line)) {
-      output.push("");
+    let expanded = expandLine(text, macros, line, errors);
+    expanded = normalizeCompatibility(expanded);
+
+    if (RE_USING_NS_STD.test(expanded)) {
+      blank();
       continue;
     }
 
-    const defineMatch = line.match(DEFINE_PATTERN);
-    if (defineMatch !== null) {
-      const name = defineMatch[1];
-      if (name === undefined) {
-        errors.push({ line: lineNo, col: 1, message: "invalid macro definition" });
-        output.push("");
-        continue;
-      }
-
-      const paramsGroup = defineMatch[3];
-      const body = defineMatch[4] ?? "";
-      if (paramsGroup === undefined) {
-        macros.set(name, { kind: "object", name, body });
-      } else {
-        const params = paramsGroup
-          .split(",")
-          .map((param) => param.trim())
-          .filter((param) => param.length > 0);
-        macros.set(name, { kind: "function", name, params, body });
-      }
-      output.push("");
+    const aliasMatch = expanded.match(RE_USING_ALIAS);
+    if (aliasMatch?.[1] !== undefined && aliasMatch[2] !== undefined) {
+      macros.set(aliasMatch[1], { kind: "object", name: aliasMatch[1], body: aliasMatch[2] });
+      blank();
       continue;
     }
 
-    errors.push({
-      line: lineNo,
-      col: 1,
-      message: "unsupported preprocessor directive",
-    });
-    output.push("");
+    const constMatch = expanded.match(RE_CONST_DECL);
+    if (constMatch?.[2] !== undefined && constMatch[3] !== undefined) {
+      macros.set(constMatch[2], { kind: "object", name: constMatch[2], body: constMatch[3] });
+      blank();
+      continue;
+    }
+
+    output.push(expanded.replace(RE_STRIP_CONST, ""));
+    for (let i = 1; i < span; i++) output.push("");
   }
 
-  if (errors.length > 0) {
-    return { ok: false, errors };
-  }
-
+  if (errors.length > 0) return { ok: false, errors };
   return { ok: true, source: output.join("\n") };
 }
+
+// ── Directive processing ──────────────────────────────────────────────────────
+
+function processDirective(
+  text: string,
+  lineNo: number,
+  macros: Map<string, MacroDefinition>,
+  errors: CompileError[],
+): void {
+  if (RE_INCLUDE.test(text)) return;
+
+  const defMatch = text.match(RE_DEFINE);
+  if (defMatch !== null) {
+    const name = defMatch[1] ?? "";
+    const paramsGroup = defMatch[3];
+    const body = (defMatch[4] ?? "").trim();
+
+    if (paramsGroup === undefined) {
+      macros.set(name, { kind: "object", name, body });
+      return;
+    }
+
+    const rawParams = paramsGroup
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    const variadic = rawParams.length > 0 && rawParams[rawParams.length - 1] === "...";
+    const params = variadic ? rawParams.slice(0, -1) : rawParams;
+    macros.set(name, { kind: "function", name, params, variadic, body });
+    return;
+  }
+
+  if (RE_ANY_DIRECTIVE.test(text)) {
+    errors.push({ line: lineNo, col: 1, message: "unsupported preprocessor directive" });
+  }
+}
+
+// ── Macro expansion ───────────────────────────────────────────────────────────
+
+const MAX_DEPTH = 32;
 
 function expandLine(
   line: string,
@@ -113,323 +130,255 @@ function expandLine(
   errors: CompileError[],
   depth = 0,
 ): string {
-  if (depth > 20) {
-    errors.push({ line: lineNo, col: 1, message: "macro expansion exceeded limit" });
+  if (depth > MAX_DEPTH) {
+    errors.push({ line: lineNo, col: 1, message: "macro expansion depth exceeded" });
     return line;
   }
 
   let result = "";
-  let index = 0;
+  let i = 0;
 
-  while (index < line.length) {
-    const ch = line[index] ?? "";
+  while (i < line.length) {
+    const ch = line[i] ?? "";
 
     if (ch === '"' || ch === "'") {
-      const { text, nextIndex } = readQuotedLiteral(line, index, ch);
-      result += text;
-      index = nextIndex;
+      const lit = readQuotedLiteral(line, i, ch);
+      result += lit.text;
+      i = lit.end;
       continue;
     }
 
-    if (ch === "/" && (line[index + 1] ?? "") === "/") {
-      result += line.slice(index);
+    if (ch === "/" && line[i + 1] === "/") {
+      result += line.slice(i);
       break;
     }
 
-    if (ch === "/" && (line[index + 1] ?? "") === "*") {
-      const end = line.indexOf("*/", index + 2);
+    if (ch === "/" && line[i + 1] === "*") {
+      const end = line.indexOf("*/", i + 2);
       if (end === -1) {
-        result += line.slice(index);
+        result += line.slice(i);
         break;
       }
-      result += line.slice(index, end + 2);
-      index = end + 2;
+      result += line.slice(i, end + 2);
+      i = end + 2;
       continue;
     }
 
-    if (isIdentifierStart(ch)) {
-      let end = index + 1;
-      while (end < line.length && isIdentifierPart(line[end] ?? "")) {
-        end += 1;
-      }
-      const name = line.slice(index, end);
+    if (isIdStart(ch)) {
+      let j = i + 1;
+      while (j < line.length && isIdPart(line[j] ?? "")) j++;
+      const name = line.slice(i, j);
       const macro = macros.get(name);
+
       if (macro === undefined) {
         result += name;
-        index = end;
+        i = j;
         continue;
       }
 
       if (macro.kind === "object") {
         result += expandLine(macro.body, macros, lineNo, errors, depth + 1);
-        index = end;
+        i = j;
         continue;
       }
 
-      const invocation = readFunctionMacroInvocation(line, end);
-      if (invocation === null) {
+      const inv = readFunctionMacroInvocation(line, j);
+      if (inv === null) {
         result += name;
-        index = end;
+        i = j;
         continue;
       }
 
-      if (invocation.args.length !== macro.params.length) {
+      const expanded = applyFunctionMacro(macro, inv.args, macros, lineNo, errors, depth);
+      if (expanded === null) {
+        const minArgs = macro.params.length;
+        const qualifier = macro.variadic ? `at least ${minArgs}` : `${minArgs}`;
         errors.push({
           line: lineNo,
-          col: index + 1,
-          message: `macro '${macro.name}' expects ${macro.params.length} arguments`,
+          col: i + 1,
+          message: `macro '${macro.name}' expects ${qualifier} argument(s)`,
         });
-        result += line.slice(index, invocation.nextIndex);
-        index = invocation.nextIndex;
+        result += line.slice(i, inv.end);
+        i = inv.end;
         continue;
       }
 
-      let expandedBody = macro.body;
-      for (let argIndex = 0; argIndex < macro.params.length; argIndex += 1) {
-        const param = macro.params[argIndex];
-        const arg = invocation.args[argIndex];
-        if (param === undefined || arg === undefined) {
-          continue;
-        }
-        expandedBody = replaceIdentifier(expandedBody, param, arg.trim());
-      }
-      result += expandLine(expandedBody, macros, lineNo, errors, depth + 1);
-      index = invocation.nextIndex;
+      result += expanded;
+      i = inv.end;
       continue;
     }
 
     result += ch;
-    index += 1;
+    i++;
   }
 
   return result;
 }
 
-function normalizeCompatibilitySyntax(line: string): string {
-  let result = line;
-
-  if (/^\s*((ios|ios_base)::sync_with_stdio|(cin|cout|cerr)\.tie)\s*\(/.test(result)) {
-    return "";
-  }
-
-  result = result.replace(/\bios_base::/g, "");
-  result = result.replace(/\bios::/g, "");
-  result = result.replace(/\bsigned\s+main\s*\(/, "int main(");
-  result = result.replace(/(\b[A-Za-z_][A-Za-z0-9_]*\b)\s*>>=\s*([^;]+);/g, "$1 = $1 >> ($2);");
-  result = result.replace(/(\b[A-Za-z_][A-Za-z0-9_]*\b)\s*<<=\s*([^;]+);/g, "$1 = $1 << ($2);");
-  result = normalizeScientificIntegerLiterals(result);
-  result = normalizeIntegerLiteralSuffixes(result);
-
-  return result;
-}
-
-function stripConstKeyword(line: string): string {
-  return line.replace(
-    /^\s*const\s+(?=(int|long\s+long|double|bool|char|string|vector|map|pair|tuple)\b)/,
-    "",
-  );
-}
-
-function normalizeCinCommaStatement(line: string): string {
-  const cinIndex = line.search(/\bcin\b/);
-  if (cinIndex < 0 || !line.slice(cinIndex).includes(">>")) {
-    return line;
-  }
-
-  let depth = 0;
-  let inString = false;
-  let inChar = false;
-  let escaped = false;
-  for (let index = cinIndex; index < line.length; index += 1) {
-    const ch = line[index] ?? "";
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (ch === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (!inChar && ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (!inString && ch === "'") {
-      inChar = !inChar;
-      continue;
-    }
-    if (inString || inChar) {
-      continue;
-    }
-    if (ch === "(" || ch === "[" || ch === "{") {
-      depth += 1;
-      continue;
-    }
-    if (ch === ")" || ch === "]" || ch === "}") {
-      depth = Math.max(0, depth - 1);
-      continue;
-    }
-    if (depth === 0 && ch === ",") {
-      const forBodyStart = findForBodyStart(line, cinIndex);
-      if (forBodyStart !== null) {
-        return `${line.slice(0, forBodyStart)}{${line.slice(forBodyStart, index)};${line.slice(index + 1)}}`;
-      }
-      return `${line.slice(0, index)};${line.slice(index + 1)}`;
-    }
-  }
-  return line;
-}
-
-function findForBodyStart(line: string, cinIndex: number): number | null {
-  const forIndex = line.search(/\bfor\s*\(/);
-  if (forIndex < 0 || forIndex > cinIndex) {
+function applyFunctionMacro(
+  macro: FunctionMacro,
+  rawArgs: string[],
+  macros: Map<string, MacroDefinition>,
+  lineNo: number,
+  errors: CompileError[],
+  depth: number,
+): string | null {
+  const minArgs = macro.params.length;
+  if (macro.variadic ? rawArgs.length < minArgs : rawArgs.length !== minArgs) {
     return null;
   }
 
-  let depth = 0;
-  for (let index = forIndex; index < line.length; index += 1) {
-    const ch = line[index] ?? "";
-    if (ch === "(") {
-      depth += 1;
-      continue;
-    }
-    if (ch === ")") {
-      depth -= 1;
-      if (depth === 0) {
-        let bodyStart = index + 1;
-        while ((line[bodyStart] ?? "").match(/\s/)) {
-          bodyStart += 1;
-        }
-        return line[bodyStart] === "{" ? null : bodyStart;
-      }
-    }
+  let body = macro.body;
+  for (let k = 0; k < macro.params.length; k++) {
+    body = replaceIdentifier(body, macro.params[k] ?? "", rawArgs[k]?.trim() ?? "");
   }
 
-  return null;
+  if (macro.variadic) {
+    const varArgs = rawArgs
+      .slice(minArgs)
+      .map((a) => a.trim())
+      .join(", ");
+    body = replaceIdentifier(body, "__VA_ARGS__", varArgs);
+  }
+
+  return expandLine(body, macros, lineNo, errors, depth + 1);
 }
 
-function normalizeScientificIntegerLiterals(line: string): string {
-  return line.replace(
-    /\b(\d+)[eE]\+?(\d+)\b/g,
-    (_match, baseText: string, exponentText: string) => {
-      const exponent = Number(exponentText);
-      if (!Number.isInteger(exponent) || exponent < 0 || exponent > 18) {
-        return _match;
+// ── Compatibility normalization ───────────────────────────────────────────────
+
+function normalizeCompatibility(line: string): string {
+  if (/^\s*((ios|ios_base)::sync_with_stdio|(cin|cout|cerr)\.tie)\s*\(/.test(line)) return "";
+
+  let s = line;
+  s = s.replace(/\bios_base::/g, "");
+  s = s.replace(/\bios::/g, "");
+  s = s.replace(/\bsigned\s+main\s*\(/, "int main(");
+  s = s.replace(/(\b[A-Za-z_][A-Za-z0-9_]*\b)\s*>>=(.*);/g, "$1 = $1 >> ($2);");
+  s = s.replace(/(\b[A-Za-z_][A-Za-z0-9_]*\b)\s*<<=(.*);/g, "$1 = $1 << ($2);");
+  s = s.replace(/\b(\d+)[eE]\+?(\d+)\b/g, (_m, base: string, exp: string) => {
+    const e = Number(exp);
+    return Number.isInteger(e) && e >= 0 && e <= 18 ? `${base}${"0".repeat(e)}` : _m;
+  });
+  s = s.replace(/\b(\d+)(ULL|ull|UL|ul|LU|lu|LL|ll|L|l|U|u)\b/g, "$1");
+  return s;
+}
+
+// ── Lexer helpers ─────────────────────────────────────────────────────────────
+
+function joinContinuationLines(rawLines: string[]): LogicalLine[] {
+  const result: LogicalLine[] = [];
+  let i = 0;
+  while (i < rawLines.length) {
+    let text = rawLines[i] ?? "";
+    const startLine = i + 1;
+    let span = 1;
+    while (text.endsWith("\\")) {
+      text = text.slice(0, -1);
+      i++;
+      span++;
+      if (i < rawLines.length) {
+        text += (rawLines[i] ?? "").trimStart();
       }
-      return `${baseText}${"0".repeat(exponent)}`;
-    },
-  );
-}
-
-function normalizeIntegerLiteralSuffixes(line: string): string {
-  return line.replace(/\b(\d+)(ULL|ull|UL|ul|LU|lu|LL|ll|L|l|U|u)\b/g, "$1");
+    }
+    result.push({ text, line: startLine, span });
+    i++;
+  }
+  return result;
 }
 
 function readQuotedLiteral(
   line: string,
   start: number,
-  quote: '"' | "'",
-): { text: string; nextIndex: number } {
-  let index = start + 1;
-  while (index < line.length) {
-    const ch = line[index] ?? "";
+  quote: string,
+): { text: string; end: number } {
+  let i = start + 1;
+  while (i < line.length) {
+    const ch = line[i] ?? "";
     if (ch === "\\") {
-      index += 2;
+      i += 2;
       continue;
     }
     if (ch === quote) {
-      index += 1;
+      i++;
       break;
     }
-    index += 1;
+    i++;
   }
-  return { text: line.slice(start, index), nextIndex: index };
+  return { text: line.slice(start, i), end: i };
 }
 
 function readFunctionMacroInvocation(
   line: string,
   start: number,
-): { args: string[]; nextIndex: number } | null {
-  let index = start;
-  while (index < line.length && /\s/.test(line[index] ?? "")) {
-    index += 1;
-  }
-  if ((line[index] ?? "") !== "(") {
-    return null;
-  }
+): { args: string[]; end: number } | null {
+  let i = start;
+  while (i < line.length && /\s/.test(line[i] ?? "")) i++;
+  if (line[i] !== "(") return null;
+  i++;
 
-  index += 1;
   const args: string[] = [];
   let depth = 0;
   let current = "";
 
-  while (index < line.length) {
-    const ch = line[index] ?? "";
+  while (i < line.length) {
+    const ch = line[i] ?? "";
     if (ch === '"' || ch === "'") {
-      const literal = readQuotedLiteral(line, index, ch);
-      current += literal.text;
-      index = literal.nextIndex;
+      const lit = readQuotedLiteral(line, i, ch);
+      current += lit.text;
+      i = lit.end;
       continue;
     }
     if (ch === "(") {
-      depth += 1;
+      depth++;
       current += ch;
-      index += 1;
+      i++;
       continue;
     }
     if (ch === ")") {
       if (depth === 0) {
-        const trimmed = current.trim();
-        if (trimmed.length > 0 || args.length > 0) {
-          args.push(current);
-        }
-        return { args, nextIndex: index + 1 };
+        if (current.trim().length > 0 || args.length > 0) args.push(current);
+        return { args, end: i + 1 };
       }
-      depth -= 1;
+      depth--;
       current += ch;
-      index += 1;
+      i++;
       continue;
     }
     if (ch === "," && depth === 0) {
       args.push(current);
       current = "";
-      index += 1;
+      i++;
       continue;
     }
     current += ch;
-    index += 1;
+    i++;
   }
 
   return null;
 }
 
-function replaceIdentifier(source: string, identifier: string, replacement: string): string {
+function replaceIdentifier(source: string, id: string, replacement: string): string {
   let result = "";
-  let index = 0;
-
-  while (index < source.length) {
-    const ch = source[index] ?? "";
-    if (isIdentifierStart(ch)) {
-      let end = index + 1;
-      while (end < source.length && isIdentifierPart(source[end] ?? "")) {
-        end += 1;
-      }
-      const token = source.slice(index, end);
-      result += token === identifier ? replacement : token;
-      index = end;
+  let i = 0;
+  while (i < source.length) {
+    const ch = source[i] ?? "";
+    if (isIdStart(ch)) {
+      let j = i + 1;
+      while (j < source.length && isIdPart(source[j] ?? "")) j++;
+      result += source.slice(i, j) === id ? replacement : source.slice(i, j);
+      i = j;
       continue;
     }
     result += ch;
-    index += 1;
+    i++;
   }
-
   return result;
 }
 
-function isIdentifierStart(ch: string): boolean {
+function isIdStart(ch: string): boolean {
   return /[A-Za-z_]/.test(ch);
 }
 
-function isIdentifierPart(ch: string): boolean {
+function isIdPart(ch: string): boolean {
   return /[A-Za-z0-9_]/.test(ch);
 }
