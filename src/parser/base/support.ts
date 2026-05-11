@@ -23,7 +23,7 @@ export abstract class BaseParserSupport extends BaseParserTypeSupport {
       return { kind: "none" };
     }
 
-    if (this.peekPrimitiveTypeKeyword()) {
+    if (this.checkTypeStart()) {
       const decls = this.parseVarDeclListNoSemicolon();
       if (decls === null || decls.length === 0) {
         return { kind: "none" };
@@ -53,8 +53,8 @@ export abstract class BaseParserSupport extends BaseParserTypeSupport {
   }
 
   protected parseVarDeclListNoSemicolon(): VarDeclNode[] | null {
-    const type = this.parsePrimitiveType();
-    if (type === null) {
+    const type = this.parseType();
+    if (type === null || type.kind !== "PrimitiveType") {
       return null;
     }
     return this.parseVarDeclaratorList(type);
